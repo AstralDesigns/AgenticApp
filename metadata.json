@@ -1,0 +1,5 @@
+{
+  "name": "Agentic Studio",
+  "description": "An agent-centric AI chat interface for managing projects, generating code, and interacting with multiple file types in a unified workspace, powered by Google Gemini.",
+  "requestFramePermissions": []
+}
