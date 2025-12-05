@@ -15,48 +15,34 @@ import { FileSystemItem } from '../../models/file-system-item.model';
 export class SidebarComponent {
   private canvasService = inject(CanvasService);
   private uiStateService = inject(UiStateService);
-  private fileSystemService = inject(FileSystemService);
+  fileSystemService = inject(FileSystemService); // Make public for template access
+  
   searchTerm = signal('');
 
-  fileTree = computed(() => {
+  filteredContent = computed(() => {
     const term = this.searchTerm().trim().toLowerCase();
-    const tree = this.fileSystemService.fileTreeState();
+    const content = this.fileSystemService.directoryContent();
     if (!term) {
-      return tree;
+      return content;
     }
-
-    const filter = (items: FileSystemItem[]): FileSystemItem[] => {
-      const results: FileSystemItem[] = [];
-      for (const item of items) {
-        if (item.type === 'file') {
-          if (item.name.toLowerCase().includes(term)) {
-            results.push(item);
-          }
-        } else if (item.type === 'folder' && item.children) {
-          const filteredChildren = filter(item.children);
-          if (filteredChildren.length > 0) {
-            results.push({ ...item, children: filteredChildren, isOpen: true });
-          }
-        }
-      }
-      return results;
-    };
-
-    return filter(tree);
+    return content.filter(item => item.name.toLowerCase().includes(term));
   });
 
   onSearchInput(event: Event): void {
     this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
-  toggleFolder(folder: FileSystemItem): void {
-    this.fileSystemService.toggleFolder(folder.path);
+  handleItemClick(item: FileSystemItem): void {
+    if (item.type === 'folder') {
+      this.fileSystemService.navigateTo(item.path);
+    } else {
+      this.openFile(item);
+    }
   }
 
-  async openFile(file: FileSystemItem): Promise<void> {
-    this.canvasService.openFile(await this.canvasService.fetchFileContent(file.path));
+  openFile(file: FileSystemItem): void {
+    this.canvasService.openFileByPath(file.path);
     
-    // On smaller screens, hide the sidebar after opening a file for a better UX
     if (window.innerWidth < 1024) {
       this.uiStateService.toggleSidebar();
     }

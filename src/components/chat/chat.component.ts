@@ -5,6 +5,7 @@ import { AiService } from '../../services/gemini.service';
 import { ChatMessage } from '../../models/chat.model';
 import { CanvasService } from '../../services/canvas.service';
 import { MarkdownPipe } from '../../pipes/markdown.pipe';
+import { FileSystemService } from '../../services/file-system.service';
 
 @Component({
   selector: 'app-chat',
@@ -18,6 +19,7 @@ export class ChatComponent {
   
   private aiService = inject(AiService);
   private canvasService = inject(CanvasService);
+  private fileSystemService = inject(FileSystemService);
 
   userInput = signal('');
   messages = signal<ChatMessage[]>([]);
@@ -56,7 +58,6 @@ export class ChatComponent {
         this.scrollToBottom();
       }
 
-      // After stream is complete, parse for actions
       const finalMessage = this.messages()[this.messages().length - 1];
       if (finalMessage) {
         this.parseAndExecuteAction(finalMessage.content);
@@ -80,10 +81,10 @@ export class ChatComponent {
     
     if (match && match[1]) {
       const filePath = match[1].trim();
-      const filePane = await this.canvasService.fetchFileContent(filePath);
-      this.canvasService.openFile(filePane);
+      // Use the FileSystemService to resolve the path relative to the current directory
+      const fullPath = this.fileSystemService.currentPath() + '/' + filePath;
+      await this.canvasService.openFileByPath(fullPath);
       
-      // Remove the action string from the displayed message for a cleaner UI
       this.messages.update(m => {
         const lastMessage = m[m.length - 1];
         if (lastMessage) {

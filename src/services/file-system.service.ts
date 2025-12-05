@@ -1,100 +1,83 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, effect, computed } from '@angular/core';
 import { FileSystemItem } from '../models/file-system-item.model';
 
 @Injectable({
   providedIn: 'root',
 })
 export class FileSystemService {
-  fileTreeState = signal<FileSystemItem[]>([
-    {
-      name: 'my-agentic-app',
-      type: 'folder',
-      icon: 'folder',
-      path: '.',
-      isOpen: true,
-      children: [
-        { name: 'package.json', type: 'file', icon: 'json', path: 'package.json' },
-        {
-          name: 'src',
-          type: 'folder',
-          icon: 'folder',
-          path: 'src',
-          isOpen: true,
-          children: [
-            { name: 'app.component.html', type: 'file', icon: 'code', path: 'src/app.component.html' },
-            { name: 'app.component.ts', type: 'file', icon: 'code', path: 'src/app.component.ts' },
-          ],
-        },
-        {
-          name: 'assets',
-          type: 'folder',
-          icon: 'folder',
-          path: 'assets',
-          isOpen: true,
-          children: [
-            { name: 'logo.png', type: 'file', icon: 'image', path: 'assets/logo.png', thumbnailUrl: 'https://picsum.photos/seed/agentic-logo/40/40' },
-            { name: 'wallpaper.jpg', type: 'file', icon: 'image', path: 'assets/wallpaper.jpg', thumbnailUrl: 'https://picsum.photos/seed/wallpaper/40/40' },
-            { name: 'field.jpeg', type: 'file', icon: 'image', path: 'assets/field.jpeg', thumbnailUrl: 'https://picsum.photos/seed/field/40/40' },
-            { name: 'sample.gif', type: 'file', icon: 'image', path: 'assets/sample.gif', thumbnailUrl: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ3N5M3VmaTZuZmZuaXNsc3M5b2p2a2pjaTUxZHM2M3g2cnZodDQyZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKSjRrfIPjeiVyE/40x40.gif' },
-            { name: 'demo.mp4', type: 'file', icon: 'video', path: 'assets/demo.mp4', thumbnailUrl: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4#t=0.5' },
-            { name: 'nature.mp4', type: 'file', icon: 'video', path: 'assets/nature.mp4', thumbnailUrl: 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/360/Jellyfish_360_10s_1MB.mp4#t=0.5' },
-          ],
-        },
-        { name: 'README.md', type: 'file', icon: 'markdown', path: 'README.md' },
-      ],
-    },
-  ]);
-
-  toggleFolder(folderPath: string): void {
-    const toggle = (items: FileSystemItem[]): FileSystemItem[] => {
-      return items.map(item => {
-        if (item.path === folderPath && item.type === 'folder') {
-          return { ...item, isOpen: !item.isOpen };
-        }
-        if (item.children) {
-          return { ...item, children: toggle(item.children) };
-        }
-        return item;
-      });
-    };
-    this.fileTreeState.update(tree => toggle(tree));
-  }
+  // Signals to hold the current state
+  currentPath = signal<string>('~');
+  directoryContent = signal<FileSystemItem[]>([]);
   
-  getMediaPlaylist(filePath: string): FileSystemItem[] {
-    let parent: FileSystemItem | null = null;
-    
-    // This recursive function finds the target file and captures its parent.
-    const findParent = (items: FileSystemItem[], currentParent: FileSystemItem | null): boolean => {
-      for (const item of items) {
-        if (item.path === filePath) {
-          parent = currentParent;
-          return true; // Target found
-        }
-        if (item.children) {
-          if (findParent(item.children, item)) {
-            return true; // Target found in a subdirectory
-          }
-        }
+  constructor() {
+    // When currentPath changes, automatically read the new directory
+    effect(async () => {
+      const path = this.currentPath();
+      const result = await window.electronAPI.readDirectory(path);
+      if ('error' in result) {
+        console.error(result.error);
+        this.directoryContent.set([]);
+      } else {
+        this.directoryContent.set(result);
       }
-      return false; // Target not found in this branch
-    };
-    
-    // Start the search from the root of the file tree.
-    findParent(this.fileTreeState(), null);
-    
-    if (parent && parent.children) {
-      const targetFile = parent.children.find(child => child.path === filePath);
-      if (!targetFile) return [];
-      
-      const targetIconType = targetFile.icon;
+    });
+  }
 
-      // If a parent was found, filter its children for media files of the same type.
-      return parent.children.filter(
-        (child) => child.type === 'file' && child.icon === targetIconType
-      );
+  // A computed signal for breadcrumbs
+  breadcrumbs = computed(() => {
+    const path = this.currentPath();
+    if (path === '~') return [{ name: '~', path: '~' }];
+
+    const parts = path.split('/').filter(p => p);
+    const crumbs = parts.map((part, index) => {
+      const crumbPath = '/' + parts.slice(0, index + 1).join('/');
+      return { name: part, path: crumbPath };
+    });
+    return [{ name: '/', path: '/' }, ...crumbs];
+  });
+
+  navigateTo(path: string): void {
+    this.currentPath.set(path);
+  }
+
+  navigateUp(): void {
+    const current = this.currentPath();
+    if (current === '~' || current === '/') return;
+    const parentPath = current.substring(0, current.lastIndexOf('/')) || '/';
+    this.currentPath.set(parentPath);
+  }
+
+  goHome(): void {
+    this.currentPath.set('~');
+  }
+
+  // This method is now used by the canvas to get real file content
+  async readFileContent(filePath: string): Promise<string> {
+    const result = await window.electronAPI.readFile(filePath);
+    if ('error' in result) {
+      console.error(result.error);
+      return `// Error reading file: ${result.error}`;
     }
-    
-    // If no parent is found, return empty.
-    return [];
+    return result.content;
+  }
+
+  // Media playlist logic remains similar but operates on the dynamic directory content
+  getMediaPlaylist(filePath: string): FileSystemItem[] {
+    const content = this.directoryContent();
+    const targetFile = content.find(child => child.path === filePath);
+    if (!targetFile) return [];
+
+    const getIconType = (name: string): string => {
+      const ext = name.split('.').pop()?.toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext!)) return 'image';
+      if (['mp4', 'webm', 'mov', 'mkv'].includes(ext!)) return 'video';
+      return 'file';
+    };
+
+    const targetIconType = getIconType(targetFile.name);
+
+    return content.filter(
+      (child) => child.type === 'file' && getIconType(child.name) === targetIconType
+    );
   }
 }

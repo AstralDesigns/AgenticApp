@@ -1,47 +1,57 @@
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
-  "newProjectRoot": "",
+  "newProjectRoot": "projects",
   "projects": {
-    "app": {
+    "agentic-studio": {
       "projectType": "application",
+      "schematics": {},
       "root": "",
-      "sourceRoot": "./",
+      "sourceRoot": "src",
       "prefix": "app",
       "architect": {
         "build": {
-          "builder": "@angular/build:application",
+          "builder": "@angular-devkit/build-angular:browser",
           "options": {
-            "outputPath": {
-              "base": "./dist",
-              "browser": "."
-            },
-            "browser": "index.tsx",
-            "tsConfig": "tsconfig.json"
+            "outputPath": "dist/agentic-studio",
+            "index": "index.html",
+            "main": "src/main.ts",
+            "polyfills": [],
+            "tsConfig": "tsconfig.app.json",
+            "assets": [],
+            "styles": [],
+            "scripts": []
           },
           "configurations": {
             "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                }
+              ],
               "outputHashing": "all"
             },
             "development": {
+              "buildOptimizer": false,
               "optimization": false,
+              "vendorChunk": true,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": true,
+              "namedChunks": true
             }
           },
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular/build:dev-server",
-          "options": {
-            "port": 3000
-          },
+          "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "app:build:production"
+              "buildTarget": "agentic-studio:build:production"
             },
             "development": {
-              "buildTarget": "app:build:development"
+              "buildTarget": "agentic-studio:build:development"
             }
           },
           "defaultConfiguration": "development"
