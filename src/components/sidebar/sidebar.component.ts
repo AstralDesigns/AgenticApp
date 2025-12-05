@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@a
 import { CommonModule } from '@angular/common';
 import { CanvasService } from '../../services/canvas.service';
 import { UiStateService } from '../../services/ui-state.service';
-import { FileSystemItem, FileSystemService } from '../../services/file-system.service';
+import { FileSystemService } from '../../services/file-system.service';
+import { FileSystemItem } from '../../models/file-system-item.model';
 
 @Component({
   selector: 'app-sidebar',
@@ -53,14 +54,15 @@ export class SidebarComponent {
   }
 
   async openFile(file: FileSystemItem): Promise<void> {
-    if (file.type === 'file') {
-      const filePane = await this.canvasService.fetchFileContent(file.path);
-      this.canvasService.openFile(filePane);
-      
-      // On smaller screens, hide the sidebar after opening a file for a better UX
-      if (window.innerWidth < 1024) {
-        this.uiStateService.toggleSidebar();
-      }
+    this.canvasService.openFile(await this.canvasService.fetchFileContent(file.path));
+    
+    // On smaller screens, hide the sidebar after opening a file for a better UX
+    if (window.innerWidth < 1024) {
+      this.uiStateService.toggleSidebar();
     }
+  }
+  
+  openSettings(): void {
+    this.uiStateService.toggleSettingsModal();
   }
 }

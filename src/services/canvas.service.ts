@@ -1,10 +1,12 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { FilePane } from '../models/file-pane.model';
+import { FileSystemService } from './file-system.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class CanvasService {
+  private fileSystemService = inject(FileSystemService);
   panes = signal<FilePane[]>([]);
   activePaneId = signal<string | null>(null);
   private untitledCounter = signal(0);
@@ -28,7 +30,8 @@ export class CanvasService {
 
 This is an interactive canvas where you can view and edit files.
 
-- Use the **Explorer** on the left to open files.
+- Use the **Explorer** on the left to browse and open files.
+- Clicking an image or video will now open a **full gallery** for that folder.
 - Chat with the **AI Agent** to generate code, write documents, or perform tasks.
 - The agent can open files here for you to review.
 
@@ -39,6 +42,34 @@ Try asking the agent: *"Open the main app component for me."*
   }
 
   openFile(pane: FilePane): void {
+    // If the file is a media file, open a gallery instead
+    if (pane.type === 'image' || pane.type === 'video') {
+      const playlist = this.fileSystemService.getMediaPlaylist(pane.id);
+      if (playlist.length > 0) {
+        const directoryPath = pane.id.substring(0, pane.id.lastIndexOf('/')) || '/';
+        const galleryType = pane.type === 'image' ? 'image-gallery' : 'video-gallery';
+        const galleryId = `gallery:${galleryType}:${directoryPath}`;
+        const galleryName = pane.type === 'image' ? 'Image Gallery' : 'Video Gallery';
+        
+        const existingGallery = this.panes().find(p => p.id === galleryId);
+        if (existingGallery) {
+          this.setActivePane(galleryId);
+        } else {
+          const galleryPane: FilePane = {
+            id: galleryId,
+            name: galleryName,
+            type: galleryType,
+            content: '', // Not used directly
+            data: playlist,
+          };
+          this.panes.update(panes => [...panes, galleryPane]);
+          this.setActivePane(galleryId);
+        }
+        return; // Stop further processing
+      }
+    }
+    
+    // Default behavior for non-media files or media files with no playlist
     const existing = this.panes().find(p => p.id === pane.id);
     if (!existing) {
       this.panes.update(panes => [...panes, pane]);
@@ -147,7 +178,15 @@ This is the main README file for the project. It contains important information 
       },
       'assets/logo.png': {
         type: 'image',
-        content: 'https://picsum.photos/seed/agentic-logo/400/400',
+        content: 'https://picsum.photos/seed/agentic-logo/800/600',
+      },
+      'assets/wallpaper.jpg': {
+        type: 'image',
+        content: 'https://picsum.photos/seed/wallpaper/800/600',
+      },
+       'assets/field.jpeg': {
+        type: 'image',
+        content: 'https://picsum.photos/seed/field/800/600',
       },
       'assets/sample.gif': {
         type: 'image',
@@ -157,6 +196,11 @@ This is the main README file for the project. It contains important information 
         type: 'video',
         content:
           'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
+      },
+       'assets/nature.mp4': {
+        type: 'video',
+        content:
+          'https://test-videos.co.uk/vids/jellyfish/mp4/h264/360/Jellyfish_360_10s_1MB.mp4',
       },
     };
 

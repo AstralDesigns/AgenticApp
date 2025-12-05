@@ -1,91 +1,117 @@
-import { Injectable } from '@angular/core';
-import { GoogleGenAI, Chat } from '@google/genai';
+import { Injectable, inject } from '@angular/core';
+import { GoogleGenAI } from '@google/genai';
 import { ChatMessage } from '../models/chat.model';
+import { SettingsService } from './settings.service';
 
-// IMPORTANT: This service is currently mocked for the Applet environment.
-// The `process.env.API_KEY` is not available here. A real implementation
-// would require a secure way to provide the API key, likely through a backend proxy.
-
+/**
+ * This service now handles multiple AI providers.
+ */
 @Injectable({
   providedIn: 'root',
 })
-export class GeminiService {
-  private chat: Chat | null = null;
-  private readonly isMockMode = true; // Set to false to try with a real key if available
-
-  constructor() {
-    if (!this.isMockMode) {
-      try {
-        // This line assumes process.env.API_KEY is replaced at build time or provided globally.
-        // It will fail in the default Applet environment.
-        const apiKey = (process.env as any).API_KEY;
-        if (!apiKey) {
-          throw new Error('API_KEY is not configured.');
-        }
-        const ai = new GoogleGenAI({ apiKey });
-        this.chat = ai.chats.create({
-          model: 'gemini-2.5-flash',
-        });
-      } catch (error) {
-        console.error('Failed to initialize Gemini Service:', error);
-      }
-    }
-  }
+export class AiService {
+  private settingsService = inject(SettingsService);
 
   async *sendMessageStream(
     history: ChatMessage[],
     message: string
   ): AsyncGenerator<string, void, unknown> {
-    if (this.isMockMode || !this.chat) {
-      if (message.toLowerCase().includes('open') && message.includes('app component')) {
-        yield* this.mockOpenFileResponse();
-      } else {
-        yield* this.mockGenericResponse();
-      }
+    const settings = this.settingsService.settings();
+    
+    if (!settings.provider || !settings.apiKey) {
+      yield 'AI provider is not configured. Please go to Settings.';
       return;
     }
 
+    if (settings.provider === 'gemini') {
+      yield* this.sendToGemini(history, message, settings.apiKey);
+    } else if (settings.provider === 'groq') {
+      yield* this.sendToGroq(history, message, settings.apiKey);
+    } else {
+      yield `Unsupported provider: ${settings.provider}`;
+    }
+  }
+
+  private async *sendToGemini(history: ChatMessage[], message: string, apiKey: string): AsyncGenerator<string, void, unknown> {
     try {
-      const response = await this.chat.sendMessageStream({ message });
+      const ai = new GoogleGenAI({ apiKey });
+      // Note: For a real app, chat history should be managed properly
+      const chat = ai.chats.create({ model: 'gemini-2.5-flash' });
+      const response = await chat.sendMessageStream({ message });
       for await (const chunk of response) {
         yield chunk.text;
       }
     } catch (error) {
       console.error('Error sending message to Gemini:', error);
-      yield 'An error occurred while communicating with the AI. Please check the console.';
+      yield 'An error occurred while communicating with Gemini. Is the API key correct?';
     }
   }
 
-  private async *mockOpenFileResponse(): AsyncGenerator<string, void, unknown> {
-    const mockResponse = `
-Of course! I can open the main app component for you. I'll load \`src/app.component.ts\` into the canvas.
+  private async *sendToGroq(history: ChatMessage[], message: string, apiKey: string): AsyncGenerator<string, void, unknown> {
+    const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+    
+    // Map history to OpenAI format
+    const messages = [
+        ...history.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.content })),
+        { role: 'user', content: message }
+    ];
 
-[ACTION:OPEN_FILE:src/app.component.ts]
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama3-8b-8192', // A common fast model on Groq
+          messages: messages,
+          stream: true,
+        }),
+      });
 
-As you can see, it sets up the main layout with the sidebar and the new workspace component. Let me know if you would like me to open any other files!
-    `;
-    const words = mockResponse.split(/(\s+)/); // Split by space, keeping spaces
-    for (const word of words) {
-      yield word;
-      await new Promise(resolve => setTimeout(resolve, 25)); // Simulate network latency
-    }
-  }
-  
-  private async *mockGenericResponse(): AsyncGenerator<string, void, unknown> {
-    const mockResponse = `
-I am Agentic Studio's AI assistant. I can help you with a variety of tasks, including opening and modifying files.
+      if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(`Groq API Error: ${errorBody.error?.message ?? 'Unknown error'}`);
+      }
+      
+      const reader = response.body?.getReader();
+      if (!reader) {
+          throw new Error('Could not get reader from response body.');
+      }
+      
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-For example, you can ask me to:
-- *"Open the main app component for me."*
-- *"What is in the README.md file?"*
-- *"Show me the project's package.json."*
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-How can I assist you?
-    `;
-    const words = mockResponse.split(/(\s+)/); // Split by space, keeping spaces
-    for (const word of words) {
-      yield word;
-      await new Promise(resolve => setTimeout(resolve, 25));
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last, possibly incomplete line
+
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const jsonStr = line.substring(6);
+                if (jsonStr === '[DONE]') {
+                    return;
+                }
+                try {
+                    const chunk = JSON.parse(jsonStr);
+                    if (chunk.choices && chunk.choices[0].delta.content) {
+                        yield chunk.choices[0].delta.content;
+                    }
+                } catch (e) {
+                    console.error('Error parsing stream chunk:', e);
+                }
+            }
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message to Groq:', error);
+      yield `An error occurred while communicating with Groq. ${error}`;
     }
   }
 }

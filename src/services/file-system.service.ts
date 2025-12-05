@@ -1,14 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-
-export interface FileSystemItem {
-  name: string;
-  path: string;
-  type: 'file' | 'folder';
-  icon: 'code' | 'folder' | 'image' | 'video' | 'markdown' | 'json';
-  thumbnailUrl?: string;
-  children?: FileSystemItem[];
-  isOpen?: boolean;
-}
+import { FileSystemItem } from '../models/file-system-item.model';
 
 @Injectable({
   providedIn: 'root',
@@ -42,8 +33,11 @@ export class FileSystemService {
           isOpen: true,
           children: [
             { name: 'logo.png', type: 'file', icon: 'image', path: 'assets/logo.png', thumbnailUrl: 'https://picsum.photos/seed/agentic-logo/40/40' },
+            { name: 'wallpaper.jpg', type: 'file', icon: 'image', path: 'assets/wallpaper.jpg', thumbnailUrl: 'https://picsum.photos/seed/wallpaper/40/40' },
+            { name: 'field.jpeg', type: 'file', icon: 'image', path: 'assets/field.jpeg', thumbnailUrl: 'https://picsum.photos/seed/field/40/40' },
             { name: 'sample.gif', type: 'file', icon: 'image', path: 'assets/sample.gif', thumbnailUrl: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ3N5M3VmaTZuZmZuaXNsc3M5b2p2a2pjaTUxZHM2M3g2cnZodDQyZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKSjRrfIPjeiVyE/40x40.gif' },
             { name: 'demo.mp4', type: 'file', icon: 'video', path: 'assets/demo.mp4', thumbnailUrl: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4#t=0.5' },
+            { name: 'nature.mp4', type: 'file', icon: 'video', path: 'assets/nature.mp4', thumbnailUrl: 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/360/Jellyfish_360_10s_1MB.mp4#t=0.5' },
           ],
         },
         { name: 'README.md', type: 'file', icon: 'markdown', path: 'README.md' },
@@ -89,13 +83,18 @@ export class FileSystemService {
     findParent(this.fileTreeState(), null);
     
     if (parent && parent.children) {
-      // If a parent was found, filter its children for media files.
+      const targetFile = parent.children.find(child => child.path === filePath);
+      if (!targetFile) return [];
+      
+      const targetIconType = targetFile.icon;
+
+      // If a parent was found, filter its children for media files of the same type.
       return parent.children.filter(
-        (child) => child.type === 'file' && (child.icon === 'image' || child.icon === 'video')
+        (child) => child.type === 'file' && child.icon === targetIconType
       );
     }
     
-    // If no parent is found (e.g., it's a root file, though not in our structure), return empty.
+    // If no parent is found, return empty.
     return [];
   }
 }

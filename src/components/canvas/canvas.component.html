@@ -21,7 +21,7 @@
             } @else {
             <div class="w-2 h-2 mr-2.5"></div>
             }
-            <span class="truncate max-w-32">{{ pane.name }}</span>
+            <span class="truncate max-w-48">{{ pane.name }}</span>
             <button
               (click)="closePane($event, pane)"
               class="ml-3 p-0.5 rounded-md hover:bg-slate-600/50 flex-shrink-0"
@@ -48,7 +48,7 @@
   }
 
   <!-- Content area -->
-  <div class="flex-1 overflow-auto">
+  <div class="flex-1 overflow-auto relative">
     @if (activePane(); as pane) {
       @switch (pane.type) {
         @case ('code') {
@@ -70,54 +70,11 @@
         @case ('welcome') {
           <div class="prose prose-invert prose-slate max-w-none p-6" [innerHTML]="pane.content | markdownToHtml"></div>
         }
-        @case ('image') {
-          <div class="relative flex items-center justify-center h-full p-4">
-            <img
-              [src]="pane.content"
-              alt="{{ pane.name }}"
-              class="max-w-full max-h-full object-contain rounded-md"
-            />
-            @if(mediaPlaylist(); as playlist) {
-              @if(playlist.length > 1) {
-                <div class="absolute inset-0 flex items-center justify-between px-2 group">
-                  <button (click)="navigateToMedia('prev')" class="p-2 bg-black/30 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-                  </button>
-                  <button (click)="navigateToMedia('next')" class="p-2 bg-black/30 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                </div>
-                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 text-white rounded-full text-sm font-medium">
-                  {{ currentMediaIndex()! + 1 }} / {{ playlist.length }}
-                </div>
-              }
-            }
-          </div>
+        @case ('image-gallery') {
+          <app-media-gallery [mediaItems]="pane.data!" (itemSelect)="openLightbox($event)"></app-media-gallery>
         }
-        @case ('video') {
-           <div class="relative flex items-center justify-center h-full p-4">
-            <video
-              controls
-              autoplay
-              [src]="pane.content"
-              class="max-w-full max-h-full rounded-md"
-            ></video>
-             @if(mediaPlaylist(); as playlist) {
-              @if(playlist.length > 1) {
-                <div class="absolute inset-0 flex items-center justify-between px-2 group">
-                  <button (click)="navigateToMedia('prev')" class="p-2 bg-black/30 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-                  </button>
-                  <button (click)="navigateToMedia('next')" class="p-2 bg-black/30 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                </div>
-                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 text-white rounded-full text-sm font-medium">
-                  {{ currentMediaIndex()! + 1 }} / {{ playlist.length }}
-                </div>
-              }
-            }
-          </div>
+        @case ('video-gallery') {
+          <app-media-gallery [mediaItems]="pane.data!" (itemSelect)="openLightbox($event)"></app-media-gallery>
         }
         @case ('pdf') {
           <div
@@ -153,4 +110,13 @@
       </div>
     }
   </div>
+
+  <!-- Lightbox sits on top of everything -->
+  @if (lightboxPlaylist(); as playlist) {
+    <app-media-lightbox 
+        [playlist]="playlist" 
+        [startIndex]="lightboxStartIndex()"
+        (close)="closeLightbox()">
+    </app-media-lightbox>
+  }
 </div>

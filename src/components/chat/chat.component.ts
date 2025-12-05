@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GeminiService } from '../../services/gemini.service';
+import { AiService } from '../../services/gemini.service';
 import { ChatMessage } from '../../models/chat.model';
 import { CanvasService } from '../../services/canvas.service';
 import { MarkdownPipe } from '../../pipes/markdown.pipe';
@@ -16,7 +16,7 @@ import { MarkdownPipe } from '../../pipes/markdown.pipe';
 export class ChatComponent {
   @ViewChild('chatContainer') private chatContainer!: ElementRef;
   
-  private geminiService = inject(GeminiService);
+  private aiService = inject(AiService);
   private canvasService = inject(CanvasService);
 
   userInput = signal('');
@@ -46,7 +46,7 @@ export class ChatComponent {
     this.messages.update(m => [...m, { role: 'model', content: '' }]);
     
     try {
-      const stream = this.geminiService.sendMessageStream(this.history(), messageContent);
+      const stream = this.aiService.sendMessageStream(this.history(), messageContent);
       for await (const chunk of stream) {
         this.messages.update(m => {
           const lastMessage = m[m.length - 1];

@@ -6,6 +6,7 @@ import { Injectable, signal } from '@angular/core';
 export class UiStateService {
   sidebarVisible = signal(true);
   chatVisible = signal(true);
+  settingsModalVisible = signal(false);
 
   toggleSidebar(): void {
     this.sidebarVisible.update(v => !v);
@@ -13,5 +14,9 @@ export class UiStateService {
 
   toggleChat(): void {
     this.chatVisible.update(v => !v);
+  }
+
+  toggleSettingsModal(): void {
+    this.settingsModalVisible.update(v => !v);
   }
 }
