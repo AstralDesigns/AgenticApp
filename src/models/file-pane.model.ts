@@ -6,4 +6,5 @@ export interface FilePane {
   type: FileType;
   content: string; // Content for text-based files, or a URL for media
   language?: string; // e.g., 'typescript' for code files
+  isUnsaved?: boolean;
 }

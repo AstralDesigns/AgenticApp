@@ -21,6 +21,64 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #64748b; /* slate-500 */
     }
+
+    /* New styles for floating panels and layout */
+    .app-main {
+      transition: padding-left 300ms ease-in-out, padding-right 300ms ease-in-out;
+    }
+    .sidebar-panel, .chat-panel {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      transition: transform 300ms ease-in-out;
+      z-index: 40;
+    }
+    .sidebar-panel {
+      left: 0;
+      transform: translateX(-100%);
+    }
+    .chat-panel {
+      right: 0;
+      transform: translateX(100%);
+    }
+    .sidebar-visible .sidebar-panel {
+      transform: translateX(0);
+    }
+    .chat-visible .chat-panel {
+      transform: translateX(0);
+    }
+    .backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 30;
+      opacity: 0;
+      transition: opacity 300ms ease-in-out;
+      pointer-events: none;
+    }
+    .chat-visible .backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    
+    @media (min-width: 1024px) {
+      .sidebar-visible .app-main {
+        padding-left: 16rem; /* w-64 */
+      }
+      .chat-visible .app-main {
+        padding-right: 24rem; /* w-96 */
+      }
+      .sidebar-panel, .chat-panel {
+        transform: translateX(0) !important;
+        position: absolute;
+      }
+      .chat-visible .backdrop {
+          display: none;
+      }
+    }
   </style>
 <script type="importmap">
 {

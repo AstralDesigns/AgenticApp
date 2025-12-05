@@ -1,10 +1,1 @@
-<div class="flex-1 flex" [class.flex-row]="showCanvas()">
-  <div class="flex flex-col" [class.w-1/2]="showCanvas()" [class.max-w-1/2]="showCanvas()" [class.w-full]="!showCanvas()">
-    <app-chat></app-chat>
-  </div>
-  @if (showCanvas()) {
-    <div class="flex flex-col border-l border-slate-700/50 w-1/2">
-      <app-canvas></app-canvas>
-    </div>
-  }
-</div>
+<app-canvas></app-canvas>

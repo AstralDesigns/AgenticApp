@@ -1,16 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CanvasService } from '../../services/canvas.service';
-
-interface FileSystemItem {
-  name: string;
-  path: string;
-  type: 'file' | 'folder';
-  icon: 'code' | 'folder' | 'image' | 'video' | 'markdown' | 'json';
-  thumbnailUrl?: string;
-  children?: FileSystemItem[];
-  isOpen?: boolean;
-}
+import { UiStateService } from '../../services/ui-state.service';
+import { FileSystemItem, FileSystemService } from '../../services/file-system.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -21,36 +13,15 @@ interface FileSystemItem {
 })
 export class SidebarComponent {
   private canvasService = inject(CanvasService);
+  private uiStateService = inject(UiStateService);
+  private fileSystemService = inject(FileSystemService);
   searchTerm = signal('');
-
-  private fileTreeState = signal<FileSystemItem[]>([
-    { 
-      name: 'my-agentic-app', type: 'folder', icon: 'folder', path: '.', isOpen: true,
-      children: [
-        { name: 'package.json', type: 'file', icon: 'json', path: 'package.json'},
-        {
-          name: 'src', type: 'folder', icon: 'folder', path: 'src', isOpen: true,
-          children: [
-            { name: 'app.component.html', type: 'file', icon: 'code', path: 'src/app.component.html' },
-            { name: 'app.component.ts', type: 'file', icon: 'code', path: 'src/app.component.ts' },
-          ]
-        },
-        {
-          name: 'assets', type: 'folder', icon: 'folder', path: 'assets', isOpen: false,
-          children: [
-            { name: 'logo.png', type: 'file', icon: 'image', path: 'assets/logo.png', thumbnailUrl: 'https://picsum.photos/seed/agentic-logo/40/40'},
-            { name: 'demo.mp4', type: 'file', icon: 'video', path: 'assets/demo.mp4', thumbnailUrl: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4#t=0.5'},
-          ]
-        },
-        { name: 'README.md', type: 'file', icon: 'markdown', path: 'README.md'},
-      ]
-    }
-  ]);
 
   fileTree = computed(() => {
     const term = this.searchTerm().trim().toLowerCase();
+    const tree = this.fileSystemService.fileTreeState();
     if (!term) {
-      return this.fileTreeState();
+      return tree;
     }
 
     const filter = (items: FileSystemItem[]): FileSystemItem[] => {
@@ -70,7 +41,7 @@ export class SidebarComponent {
       return results;
     };
 
-    return filter(this.fileTreeState());
+    return filter(tree);
   });
 
   onSearchInput(event: Event): void {
@@ -78,24 +49,18 @@ export class SidebarComponent {
   }
 
   toggleFolder(folder: FileSystemItem): void {
-    const toggle = (items: FileSystemItem[], targetPath: string): FileSystemItem[] => {
-        return items.map(item => {
-            if (item.path === targetPath) {
-                return { ...item, isOpen: !item.isOpen };
-            }
-            if (item.children) {
-                return { ...item, children: toggle(item.children, targetPath) };
-            }
-            return item;
-        });
-    };
-    this.fileTreeState.update(tree => toggle(tree, folder.path));
+    this.fileSystemService.toggleFolder(folder.path);
   }
 
   async openFile(file: FileSystemItem): Promise<void> {
     if (file.type === 'file') {
       const filePane = await this.canvasService.fetchFileContent(file.path);
       this.canvasService.openFile(filePane);
+      
+      // On smaller screens, hide the sidebar after opening a file for a better UX
+      if (window.innerWidth < 1024) {
+        this.uiStateService.toggleSidebar();
+      }
     }
   }
 }

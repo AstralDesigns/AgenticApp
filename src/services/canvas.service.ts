@@ -7,6 +7,7 @@ import { FilePane } from '../models/file-pane.model';
 export class CanvasService {
   panes = signal<FilePane[]>([]);
   activePaneId = signal<string | null>(null);
+  private untitledCounter = signal(0);
 
   activePane = computed(() => {
     const panes = this.panes();
@@ -19,10 +20,10 @@ export class CanvasService {
 
   constructor() {
     this.openFile({
-        id: 'welcome',
-        name: 'Welcome.md',
-        type: 'markdown',
-        content: `
+      id: 'welcome',
+      name: 'Welcome.md',
+      type: 'welcome',
+      content: `
 # Welcome to Agentic Studio
 
 This is an interactive canvas where you can view and edit files.
@@ -32,7 +33,8 @@ This is an interactive canvas where you can view and edit files.
 - The agent can open files here for you to review.
 
 Try asking the agent: *"Open the main app component for me."*
-        `
+        `,
+      isUnsaved: false,
     });
   }
 
@@ -44,34 +46,66 @@ Try asking the agent: *"Open the main app component for me."*
     this.setActivePane(pane.id);
   }
 
+  createNewFile(type: 'markdown' | 'code'): void {
+    this.untitledCounter.update(c => c + 1);
+    const newCount = this.untitledCounter();
+    const extension = type === 'markdown' ? 'md' : 'ts';
+    const name = `Untitled-${newCount}.${extension}`;
+    const newPane: FilePane = {
+      id: `untitled-${Date.now()}`,
+      name: name,
+      type: type,
+      content: '',
+      isUnsaved: true,
+      language: type === 'code' ? 'typescript' : undefined,
+    };
+    this.openFile(newPane);
+  }
+
+  updateActivePaneContent(newContent: string): void {
+    const activeId = this.activePaneId();
+    if (!activeId) return;
+
+    this.panes.update(panes => {
+      return panes.map(p =>
+        p.id === activeId
+          ? { ...p, content: newContent, isUnsaved: true }
+          : p
+      );
+    });
+  }
+
   setActivePane(id: string): void {
     this.activePaneId.set(id);
   }
 
   closePane(id: string): void {
     this.panes.update(panes => {
-        const index = panes.findIndex(p => p.id === id);
-        if (index === -1) return panes;
+      const index = panes.findIndex(p => p.id === id);
+      if (index === -1) return panes;
 
-        const newPanes = panes.filter(p => p.id !== id);
-        
-        if (this.activePaneId() === id) {
-            if (newPanes.length > 0) {
-                const newIndex = Math.max(0, index - 1);
-                this.activePaneId.set(newPanes[newIndex].id);
-            } else {
-                this.activePaneId.set(null);
-            }
+      const newPanes = panes.filter(p => p.id !== id);
+
+      if (this.activePaneId() === id) {
+        if (newPanes.length > 0) {
+          const newIndex = Math.max(0, index - 1);
+          this.activePaneId.set(newPanes[newIndex].id);
+        } else {
+          this.activePaneId.set(null);
         }
-        return newPanes;
+      }
+      return newPanes;
     });
   }
 
   // Mock fetching file content
   async fetchFileContent(path: string): Promise<FilePane> {
     // In a real desktop app, this would use native file system APIs.
-    const MOCK_FILES: Record<string, Omit<FilePane, 'id'|'name'>> = {
-      'src/app.component.ts': { type: 'code', language: 'typescript', content: `import { ChangeDetectionStrategy, Component } from '@angular/core';
+    const MOCK_FILES: Record<string, Omit<FilePane, 'id' | 'name'>> = {
+      'src/app.component.ts': {
+        type: 'code',
+        language: 'typescript',
+        content: `import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { WorkspaceComponent } from './components/workspace/workspace.component';
 
@@ -81,12 +115,20 @@ import { WorkspaceComponent } from './components/workspace/workspace.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SidebarComponent, WorkspaceComponent],
 })
-export class AppComponent {}` },
-      'src/app.component.html': { type: 'code', language: 'html', content: `<div class="flex h-screen w-full font-sans">
+export class AppComponent {}`,
+      },
+      'src/app.component.html': {
+        type: 'code',
+        language: 'html',
+        content: `<div class="flex h-screen w-full font-sans">
   <app-sidebar></app-sidebar>
   <app-workspace></app-workspace>
-</div>`},
-      'package.json': { type: 'code', language: 'json', content: `{
+</div>`,
+      },
+      'package.json': {
+        type: 'code',
+        language: 'json',
+        content: `{
   "name": "agentic-studio",
   "version": "0.1.0",
   "private": true,
@@ -95,29 +137,46 @@ export class AppComponent {}` },
     "@angular/core": "^18.0.0",
     "@google/genai": "^0.2.1"
   }
-}`},
-      'README.md': { type: 'markdown', content: `# Project README
+}`,
+      },
+      'README.md': {
+        type: 'markdown',
+        content: `# Project README
 
-This is the main README file for the project. It contains important information about setting up and running the application.`},
-      'assets/logo.png': { type: 'image', content: 'https://picsum.photos/seed/agentic-logo/400/400' },
-      'assets/demo.mp4': { type: 'video', content: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4'}
+This is the main README file for the project. It contains important information about setting up and running the application.`,
+      },
+      'assets/logo.png': {
+        type: 'image',
+        content: 'https://picsum.photos/seed/agentic-logo/400/400',
+      },
+      'assets/sample.gif': {
+        type: 'image',
+        content: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ3N5M3VmaTZuZmZuaXNsc3M5b2p2a2pjaTUxZHM2M3g2cnZodDQyZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKSjRrfIPjeiVyE/giphy.gif',
+      },
+      'assets/demo.mp4': {
+        type: 'video',
+        content:
+          'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
+      },
     };
-    
+
     if (path in MOCK_FILES) {
-        const file = MOCK_FILES[path];
-        return {
-            id: path,
-            name: path.split('/').pop() || path,
-            ...file
-        };
+      const file = MOCK_FILES[path];
+      return {
+        id: path,
+        name: path.split('/').pop() || path,
+        isUnsaved: false,
+        ...file,
+      };
     }
 
     return {
-        id: path,
-        name: path.split('/').pop() || path,
-        type: 'code',
-        language: 'plaintext',
-        content: `// Mock file not found: ${path}`
+      id: path,
+      name: path.split('/').pop() || path,
+      type: 'code',
+      language: 'plaintext',
+      content: `// Mock file not found: ${path}`,
+      isUnsaved: false,
     };
   }
 }
