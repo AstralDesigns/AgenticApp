@@ -36,13 +36,32 @@
       @for(item of fileTree(); track item.path) {
         <!-- Top Level Item -->
         <div (click)="item.type === 'folder' ? toggleFolder(item) : openFile(item)" class="flex items-center text-sm font-medium text-slate-300 py-1.5 px-2 rounded-md hover:bg-slate-700/50 cursor-pointer">
-          @if(item.type === 'folder') {
+          <!-- Thumbnail for Image -->
+          @if (item.icon === 'image' && item.thumbnailUrl) {
+            <img [src]="item.thumbnailUrl" alt="{{ item.name }}" class="w-4 h-4 mr-2 object-cover rounded-sm shrink-0" />
+          }
+          <!-- Thumbnail for Video -->
+          @else if (item.icon === 'video' && item.thumbnailUrl) {
+            <video [src]="item.thumbnailUrl" muted class="w-4 h-4 mr-2 object-cover rounded-sm shrink-0"></video>
+          }
+          <!-- Icon for Folder -->
+          @else if (item.type === 'folder') {
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-sky-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
-          } @else if(item.icon === 'code') {
+          }
+          <!-- Icon for Code -->
+          @else if (item.icon === 'code') {
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-emerald-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-          } @else if(item.icon === 'image') {
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-fuchsia-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" /></svg>
-          } @else {
+          }
+          <!-- Icon for JSON -->
+          @else if (item.icon === 'json') {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+          }
+          <!-- Icon for Markdown -->
+          @else if (item.icon === 'markdown') {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-slate-400 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M14 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zM3 12V4h1.5l1.5 2 1.5-2H9v8H7.5V7.5L6 9.5 4.5 7.5V12H3zm10 0h-1.5V9.5l-1-1-1 1V12H8V4h1.5v3.5l1-1 1 1V4H13v8z"/></svg>
+          }
+          <!-- Default file icon -->
+          @else {
              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-slate-500 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>
           }
           <span class="truncate">{{ item.name }}</span>
@@ -52,14 +71,20 @@
           <div class="pl-4 border-l border-slate-700 ml-2">
             @for(child of item.children; track child.path) {
               <div (click)="child.type === 'folder' ? toggleFolder(child) : openFile(child)" class="flex items-center text-sm font-medium text-slate-400 py-1.5 px-2 rounded-md hover:bg-slate-700/50 cursor-pointer">
-                 @if(child.type === 'folder') {
+                 @if (child.icon === 'image' && child.thumbnailUrl) {
+                  <img [src]="child.thumbnailUrl" alt="{{ child.name }}" class="w-4 h-4 mr-2 object-cover rounded-sm shrink-0" />
+                 }
+                 @else if (child.icon === 'video' && child.thumbnailUrl) {
+                  <video [src]="child.thumbnailUrl" muted class="w-4 h-4 mr-2 object-cover rounded-sm shrink-0"></video>
+                 }
+                 @else if(child.type === 'folder') {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-sky-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
                   } @else if(child.icon === 'code') {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-emerald-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-                  } @else if(child.icon === 'image') {
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-fuchsia-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" /></svg>
-                  } @else if(child.icon === 'video') {
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-rose-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /><path d="M14.553 7.106A1 1 0 0014 8v4a1 1 0 001.553.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+                  } @else if(child.icon === 'json') {
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                  } @else if(child.icon === 'markdown') {
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-slate-400 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M14 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zM3 12V4h1.5l1.5 2 1.5-2H9v8H7.5V7.5L6 9.5 4.5 7.5V12H3zm10 0h-1.5V9.5l-1-1-1 1V12H8V4h1.5v3.5l1-1 1 1V4H13v8z"/></svg>
                   } @else {
                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-slate-500 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>
                   }
@@ -70,12 +95,18 @@
                 <div class="pl-4 border-l border-slate-700 ml-2">
                   @for(grandchild of child.children; track grandchild.path) {
                     <div (click)="openFile(grandchild)" class="flex items-center text-sm font-medium text-slate-400 py-1.5 px-2 rounded-md hover:bg-slate-700/50 cursor-pointer">
-                      @if(grandchild.icon === 'code') {
+                      @if (grandchild.icon === 'image' && grandchild.thumbnailUrl) {
+                        <img [src]="grandchild.thumbnailUrl" alt="{{ grandchild.name }}" class="w-4 h-4 mr-2 object-cover rounded-sm shrink-0" />
+                      }
+                      @else if (grandchild.icon === 'video' && grandchild.thumbnailUrl) {
+                        <video [src]="grandchild.thumbnailUrl" muted class="w-4 h-4 mr-2 object-cover rounded-sm shrink-0"></video>
+                      }
+                      @else if(grandchild.icon === 'code') {
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-emerald-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-                      } @else if(grandchild.icon === 'image') {
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-fuchsia-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" /></svg>
-                      } @else if(grandchild.icon === 'video') {
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-rose-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /><path d="M14.553 7.106A1 1 0 0014 8v4a1 1 0 001.553.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+                      } @else if(grandchild.icon === 'json') {
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                      } @else if(grandchild.icon === 'markdown') {
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-slate-400 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M14 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zM3 12V4h1.5l1.5 2 1.5-2H9v8H7.5V7.5L6 9.5 4.5 7.5V12H3zm10 0h-1.5V9.5l-1-1-1 1V12H8V4h1.5v3.5l1-1 1 1V4H13v8z"/></svg>
                       } @else {
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-slate-500 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>
                       }

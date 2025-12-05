@@ -7,6 +7,7 @@ interface FileSystemItem {
   path: string;
   type: 'file' | 'folder';
   icon: 'code' | 'folder' | 'image' | 'video' | 'markdown' | 'json';
+  thumbnailUrl?: string;
   children?: FileSystemItem[];
   isOpen?: boolean;
 }
@@ -37,8 +38,8 @@ export class SidebarComponent {
         {
           name: 'assets', type: 'folder', icon: 'folder', path: 'assets', isOpen: false,
           children: [
-            { name: 'logo.png', type: 'file', icon: 'image', path: 'assets/logo.png'},
-            { name: 'demo.mp4', type: 'file', icon: 'video', path: 'assets/demo.mp4'},
+            { name: 'logo.png', type: 'file', icon: 'image', path: 'assets/logo.png', thumbnailUrl: 'https://picsum.photos/seed/agentic-logo/40/40'},
+            { name: 'demo.mp4', type: 'file', icon: 'video', path: 'assets/demo.mp4', thumbnailUrl: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4#t=0.5'},
           ]
         },
         { name: 'README.md', type: 'file', icon: 'markdown', path: 'README.md'},
