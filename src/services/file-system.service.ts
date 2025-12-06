@@ -58,7 +58,16 @@ export class FileSystemService {
       console.error(result.error);
       return `// Error reading file: ${result.error}`;
     }
+    // FIX: Prevent rendering binary content in the text editor.
+    if (result.encoding === 'base64') {
+      return `// Binary file content not displayed: ${filePath}`;
+    }
     return result.content;
+  }
+
+  // FIX: Add a new method to get raw file data for components that need to handle different encodings.
+  async readFile(filePath: string): Promise<{ error: string } | { content: string; encoding: 'utf-8' | 'base64' }> {
+    return window.electronAPI.readFile(filePath);
   }
 
   // Media playlist logic remains similar but operates on the dynamic directory content

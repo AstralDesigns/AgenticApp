@@ -4,9 +4,12 @@
   "description": "An agent-centric AI chat interface for managing projects.",
   "main": "main.js",
   "scripts": {
-    "start": "ng serve & electron .",
+    "ng": "ng",
+    "start": "concurrently -k \"npm:build-watch\" \"npm:electron-dev\"",
     "build": "ng build",
-    "package": "electron-builder"
+    "build-watch": "ng build --watch",
+    "electron-dev": "electron .",
+    "package": "ng build && electron-builder"
   },
   "private": true,
   "dependencies": {
@@ -23,8 +26,10 @@
     "@angular-devkit/build-angular": "^18.1.0",
     "@angular/cli": "^18.1.0",
     "@angular/compiler-cli": "^18.1.0",
+    "concurrently": "^8.2.2",
     "electron": "^31.2.1",
     "electron-builder": "^24.13.3",
+    "electron-reloader": "^1.2.3",
     "typescript": "~5.5.2"
   }
 }

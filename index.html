@@ -60,7 +60,7 @@
       transition: opacity 300ms ease-in-out;
       pointer-events: none;
     }
-    .chat-visible .backdrop {
+    .chat-visible .backdrop, .sidebar-visible .backdrop {
         opacity: 1;
         pointer-events: auto;
     }
@@ -76,7 +76,7 @@
         transform: translateX(0) !important;
         position: absolute;
       }
-      .chat-visible .backdrop {
+      .chat-visible .backdrop, .sidebar-visible .backdrop {
           display: none;
       }
     }
@@ -90,13 +90,12 @@
     "rxjs/webSocket": "https://aistudiocdn.com/rxjs@^7.8.2/webSocket?conditions=es2015",
     "rxjs/testing": "https://aistudiocdn.com/rxjs@^7.8.2/testing?conditions=es2015",
     "rxjs/fetch": "https://aistudiocdn.com/rxjs@^7.8.2/fetch?conditions=es2015",
-    "@angular/compiler": "https://next.esm.sh/@angular/compiler@^21.0.3?external=rxjs",
     "@angular/core": "https://next.esm.sh/@angular/core@^21.0.3?external=rxjs",
-    "@angular/common/http": "https://next.esm.sh/@angular/common@^21.0.3/http?external=rxjs",
-    "@angular/platform-browser": "https://next.esm.sh/@angular/platform-browser@^21.0.3?external=rxjs",
     "@angular/common": "https://next.esm.sh/@angular/common@^21.0.3?external=rxjs",
     "@google/genai": "https://next.esm.sh/@google/genai@^1.31.0?external=rxjs",
-    "@angular/forms": "https://next.esm.sh/@angular/forms@^21.0.3?external=rxjs"
+    "@angular/forms": "https://next.esm.sh/@angular/forms@^21.0.3?external=rxjs",
+    "@angular/platform-browser": "https://next.esm.sh/@angular/platform-browser@^21.0.3?external=rxjs",
+    "@angular/common/http": "https://next.esm.sh/@angular/common@^21.0.3/http?external=rxjs"
   }
 }
 </script>

@@ -51,4 +51,24 @@ export class SidebarComponent {
   openSettings(): void {
     this.uiStateService.toggleSettingsModal();
   }
+
+  getIconForFile(fileName: string): string {
+    const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) {
+      return 'image';
+    }
+    if (['mp4', 'webm', 'mov', 'mkv'].includes(extension)) {
+      return 'video';
+    }
+    if (['ts', 'js', 'html', 'css', 'scss'].includes(extension)) {
+      return 'code';
+    }
+    if (extension === 'json') {
+      return 'json';
+    }
+    if (extension === 'md') {
+      return 'markdown';
+    }
+    return 'default';
+  }
 }

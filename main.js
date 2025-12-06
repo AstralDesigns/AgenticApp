@@ -3,6 +3,18 @@ const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
 
+// Disable hardware acceleration to prevent GPU issues on some systems
+app.disableHardwareAcceleration();
+
+const isDev = !app.isPackaged;
+
+// Enable live reload for Electron development
+if (isDev) {
+  try {
+    require('electron-reloader')(module);
+  } catch (_) {}
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -14,14 +26,13 @@ function createWindow() {
     },
   });
 
-  // Load the Angular app. In development, this will be from the dev server.
-  // In production, this will be from the built file.
-  const isDev = !app.isPackaged;
+  // Load the built Angular app directly from the file system
+  const appPath = path.join(__dirname, 'dist/agentic-studio/browser/index.html');
+  win.loadFile(appPath);
+
+  // Open DevTools in development mode
   if (isDev) {
-    win.loadURL('http://localhost:4200');
     win.webContents.openDevTools();
-  } else {
-    win.loadFile(path.join(__dirname, 'dist/agentic-studio/browser/index.html'));
   }
 }
 
@@ -46,11 +57,13 @@ ipcMain.handle('read-directory', async (event, dirPath) => {
   try {
     const resolvedPath = dirPath === '~' ? os.homedir() : dirPath;
     const items = await fs.readdir(resolvedPath, { withFileTypes: true });
-    return items.map(item => ({
-      name: item.name,
-      path: path.join(resolvedPath, item.name),
-      type: item.isDirectory() ? 'folder' : 'file',
-    }));
+    return items
+      .filter(item => !item.name.startsWith('.')) // Basic filter for hidden files
+      .map(item => ({
+        name: item.name,
+        path: path.join(resolvedPath, item.name),
+        type: item.isDirectory() ? 'folder' : 'file',
+      }));
   } catch (error) {
     console.error('Failed to read directory:', error);
     return { error: error.message };
@@ -60,8 +73,18 @@ ipcMain.handle('read-directory', async (event, dirPath) => {
 // IPC handler for reading a file
 ipcMain.handle('read-file', async (event, filePath) => {
     try {
-        const content = await fs.readFile(filePath, 'utf-8');
-        return { content };
+        // Differentiate between binary media files and text files.
+        // Read common image/video formats as base64, and everything else (including SVG) as utf-8.
+        const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov', '.mkv'];
+        const extension = path.extname(filePath).toLowerCase();
+
+        if (mediaExtensions.includes(extension)) {
+            const data = await fs.readFile(filePath);
+            return { content: data.toString('base64'), encoding: 'base64' };
+        } else {
+            const content = await fs.readFile(filePath, 'utf-8');
+            return { content, encoding: 'utf-8' };
+        }
     } catch (error) {
         console.error('Failed to read file:', error);
         return { error: error.message };
