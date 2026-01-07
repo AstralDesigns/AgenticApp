@@ -132,7 +132,6 @@ export default function ChatPanel() {
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<{ x: number; y: number } | null>(null);
-  const [hoverCorrection, setHoverCorrection] = useState<{ x: number; y: number; word: string; suggestions: string[] } | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionDropdownRef = useRef<HTMLDivElement>(null);
@@ -537,13 +536,44 @@ export default function ChatPanel() {
     }
   };
 
+  const replaceWord = (oldWord: string, newWord: string) => {
+    const newValue = input.replace(new RegExp(`\\b${oldWord}\\b`, 'i'), newWord);
+    setInput(newValue);
+    setContextMenu(null); // Close context menu
+  };
+
   const handleInputContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const cmd = isMac ? '⌘' : 'Ctrl+';
     
+    // Check for word under cursor for spellcheck/correction
+    let suggestions: any[] = [];
+    if (textareaRef.current) {
+       // Simple heuristic: get word around cursor or selection
+       // For exact positioning we'd need more complex logic, but checking the whole input
+       // against our mock dictionary is a reasonable approximation for this feature.
+       const text = input;
+       const words = text.split(/\s+/);
+       for (const word of words) {
+         const cleanWord = word.replace(/[.,!?;:]/g, '').toLowerCase();
+         if (MOCK_ERRORS[cleanWord]) {
+           suggestions = MOCK_ERRORS[cleanWord].map(s => ({
+             label: s,
+             onClick: () => replaceWord(cleanWord, s)
+           }));
+           break; // Only show suggestions for the first error found for simplicity
+         }
+       }
+    }
+
     const items = [
+      ...(suggestions.length > 0 ? [
+        { label: 'Corrections', disabled: true },
+        ...suggestions,
+        { divider: true }
+      ] : []),
       { label: 'Undo', icon: <Undo size={14} />, shortcut: `${cmd}Z`, onClick: () => {
         textareaRef.current?.focus();
         document.execCommand('undo');
@@ -615,52 +645,6 @@ export default function ChatPanel() {
       });
     }
   };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!textareaRef.current) return;
-    const text = input;
-    const words = text.split(/\s+/);
-    for (const word of words) {
-      const cleanWord = word.replace(/[.,!?;:]/g, '').toLowerCase();
-      if (MOCK_ERRORS[cleanWord]) {
-        if (!hoverCorrection || hoverCorrection.word !== cleanWord) {
-          setHoverCorrection({ 
-            x: e.clientX, 
-            y: e.clientY, 
-            word: cleanWord, 
-            suggestions: MOCK_ERRORS[cleanWord] 
-          });
-        }
-        return;
-      }
-    }
-    if (hoverCorrection) setHoverCorrection(null);
-  };
-
-  const replaceWord = (oldWord: string, newWord: string) => {
-    const newValue = input.replace(new RegExp(`\\b${oldWord}\\b`, 'i'), newWord);
-    setInput(newValue);
-    setHoverCorrection(null);
-  };
-
-  const correctionList = hoverCorrection ? (
-    <div 
-      className="fixed z-[11000] bg-black border border-white/10 rounded-xl shadow-2xl p-1 flex flex-col gap-1 min-w-[140px] animate-in fade-in slide-in-from-top-1 duration-150 backdrop-blur-xl"
-      style={{ top: hoverCorrection.y + 15, left: hoverCorrection.x }}
-      onMouseLeave={() => setHoverCorrection(null)}
-    >
-      <div className="text-[10px] text-white/40 px-3 py-1.5 border-b border-white/5 font-medium uppercase tracking-wider">Suggestions for "{hoverCorrection.word}"</div>
-      {hoverCorrection.suggestions.map(s => (
-        <button 
-          key={s} 
-          onClick={() => replaceWord(hoverCorrection.word, s)}
-          className="text-xs text-left px-3 py-1.5 mx-1 rounded-lg hover:bg-slate-800 transition-colors text-white/80 hover:text-white font-medium"
-        >
-          {s}
-        </button>
-      ))}
-    </div>
-  ) : null;
 
   const renderEvent = (event: ChatEvent) => {
     switch (event.type) {
@@ -892,30 +876,17 @@ export default function ChatPanel() {
         )}
         
         <div className="relative flex flex-col gap-2">
-          {correctionList}
-
+          
           <textarea
             ref={textareaRef}
             value={input}
             spellCheck="true"
             onContextMenu={handleInputContextMenu}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => setHoverCorrection(null)}
             onChange={e => { 
               const val = e.target.value;
               setInput(val); 
               e.target.style.height = 'auto'; 
               e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
-              const lastWord = val.trim().split(/\s+/).pop()?.replace(/[.,!?;:]/g, '').toLowerCase() || '';
-              if (MOCK_ERRORS[lastWord]) {
-                const rect = e.target.getBoundingClientRect();
-                setHoverCorrection({ 
-                  x: rect.left + 50, 
-                  y: rect.top - 40, 
-                  word: lastWord, 
-                  suggestions: MOCK_ERRORS[lastWord] 
-                });
-              }
             }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
             placeholder="Ask Alpha to build something..."
@@ -1017,8 +988,6 @@ export default function ChatPanel() {
           onClose={() => setShowEmojiPicker(null)}
         />
       )}
-
-      {hoverCorrection && createPortal(correctionList, document.body)}
     </div>
   );
 }

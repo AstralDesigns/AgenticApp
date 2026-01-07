@@ -172,7 +172,7 @@ let projectWatcher: FSWatcher | null = null;
 let currentProjectPath: string | null = null;
 
 // Debouncing for file watcher events
-const fileWatcherDebounceMap = new Map<string, NodeJS.Timeout>();
+const fileWatcherDebounceMap = new Map<string, any>();
 const processedEvents = new Set<string>();
 const DEBOUNCE_DELAY = 150; // ms
 
@@ -867,7 +867,7 @@ ipcMain.handle('execute-command', async (_, command: string, options: any = {}) 
 
     let stdout = '';
     let stderr = '';
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: any | null = null;
 
     if (timeout > 0) {
       timeoutId = setTimeout(() => {

@@ -15,7 +15,7 @@ export default function MediaGallery({ mediaItems, mediaType }: MediaGalleryProp
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null);
   const thumbnailService = useThumbnailService();
   const { addContextImage, contextImages } = useStore();
-  const wheelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wheelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const itemsToPreload = mediaItems.map(item => ({ path: item.path, name: item.name }));

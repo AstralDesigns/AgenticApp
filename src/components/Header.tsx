@@ -1,9 +1,14 @@
-import { Menu, MessageSquare, Settings } from 'lucide-react';
+import { Menu, MessageSquare, Settings, Command } from 'lucide-react';
 import { useStore } from '../store';
 import CanvasIcon from './CanvasIcon';
 
 export default function Header() {
   const { toggleSidebar, toggleChat, setShowSettings } = useStore();
+
+  const handleCommandPalette = () => {
+    // Dispatch event to trigger command palette in editor
+    window.dispatchEvent(new CustomEvent('trigger-command-palette'));
+  };
 
   return (
     <header 
@@ -26,7 +31,16 @@ export default function Header() {
       </div>
       
       <div className="flex-1 flex items-center justify-center px-2">
-        {/* Command palette or search can go here */}
+        <button
+          onClick={handleCommandPalette}
+          className="flex items-center gap-2 px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded-md text-xs text-muted transition-colors w-64 justify-between group"
+        >
+          <div className="flex items-center gap-1.5">
+            <Command className="h-3 w-3" />
+            <span>Command Palette...</span>
+          </div>
+          <span className="opacity-0 group-hover:opacity-50 text-[10px]">F1</span>
+        </button>
       </div>
       
       <div className="flex items-center gap-1.5">

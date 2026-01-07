@@ -7,7 +7,7 @@ export default function BatchApprovalWidget() {
   // Filter out accepted/rejected diffs - only show pending ones
   const pendingEntries = Array.from(pendingDiffs.entries()).filter(
     ([filePath]) => !acceptedDiffs.has(filePath) && !rejectedDiffs.has(filePath)
-  );
+  ) as [string, any][]; // Cast as string array
   const pendingCount = pendingEntries.length;
 
   if (pendingCount === 0) return null;

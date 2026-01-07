@@ -32,6 +32,19 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
     return () => window.removeEventListener('focus', handleFocus);
   }, [refreshOpenFiles]);
 
+  // Listen for global command palette trigger
+  useEffect(() => {
+    const handleTriggerPalette = () => {
+      if (editorRef.current) {
+        editorRef.current.focus();
+        editorRef.current.trigger('anyString', 'editor.action.quickCommand', {});
+      }
+    };
+
+    window.addEventListener('trigger-command-palette', handleTriggerPalette);
+    return () => window.removeEventListener('trigger-command-palette', handleTriggerPalette);
+  }, []);
+
   const handleEditorChange = (value: string | undefined) => {
     const newContent = value || '';
     setEditorContent(newContent);
@@ -40,6 +53,9 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
+    
+    // Auto-focus the editor when it mounts
+    editor.focus();
     
     // Track editor selection for paste detection in chat
     const disposable = editor.onDidChangeCursorSelection(() => {
@@ -276,6 +292,60 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
   };
 
   const defineMonacoThemes = (monaco: any) => {
+    // Helper to get CSS variable values
+    const getCssVar = (name: string) => {
+      if (typeof window === 'undefined') return '#000000';
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    };
+
+    // Deep theme configuration that covers internal widgets (palette, find, suggestions)
+    const getCommonThemeRules = (baseColors: any) => {
+      return {
+        // Base Editor
+        'editor.background': baseColors.bg,
+        'editor.foreground': baseColors.fg,
+        'editorLineNumber.foreground': baseColors.line,
+        'editorLineNumber.activeForeground': baseColors.accent,
+        'editor.selectionBackground': baseColors.selection,
+        'editor.lineHighlightBackground': baseColors.lineHighlight,
+        'editorCursor.foreground': baseColors.accent,
+        
+        // Command Palette / Quick Input
+        'quickInput.background': baseColors.widgetBg,
+        'quickInput.foreground': baseColors.fg,
+        'quickInputTitle.background': baseColors.widgetBg,
+        'pickerGroup.foreground': baseColors.accent,
+        'pickerGroup.border': baseColors.border,
+        
+        // Lists (Suggestions, Palette results)
+        'list.hoverBackground': baseColors.hover,
+        'list.activeSelectionBackground': baseColors.accent + '33', // 20% opacity
+        'list.activeSelectionForeground': baseColors.accent,
+        'list.inactiveSelectionBackground': baseColors.hover,
+        'list.hoverForeground': baseColors.fg,
+        
+        // Editor Widgets (Find/Replace, Hover)
+        'editorWidget.background': baseColors.widgetBg,
+        'editorWidget.border': baseColors.border,
+        'editorSuggestWidget.background': baseColors.widgetBg,
+        'editorSuggestWidget.border': baseColors.border,
+        'editorSuggestWidget.selectedBackground': baseColors.accent + '33',
+        'editorHoverWidget.background': baseColors.widgetBg,
+        'editorHoverWidget.border': baseColors.border,
+        
+        // Inputs (Find box, etc)
+        'input.background': baseColors.inputBg,
+        'input.foreground': baseColors.fg,
+        'input.border': baseColors.border,
+        'inputOption.activeBorder': baseColors.accent,
+        
+        // Scrollbar
+        'scrollbarSlider.background': baseColors.line + '33',
+        'scrollbarSlider.hoverBackground': baseColors.line + '66',
+        'scrollbarSlider.activeBackground': baseColors.line + '88',
+      };
+    };
+
     // Alpha Theme (Deep Slate)
     monaco.editor.defineTheme('alpha-theme', {
       base: 'vs-dark',
@@ -288,15 +358,18 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
         { token: 'type', foreground: '4EC9B0' },
         { token: 'function', foreground: 'DCDCAA' },
       ],
-      colors: {
-        'editor.background': '#0f172a',
-        'editor.foreground': '#f8fafc',
-        'editorLineNumber.foreground': '#475569',
-        'editorLineNumber.activeForeground': '#94a3b8',
-        'editor.selectionBackground': '#334155',
-        'editor.lineHighlightBackground': '#1e293b',
-        'editorCursor.foreground': '#0ea5e9',
-      }
+      colors: getCommonThemeRules({
+        bg: '#0f172a',
+        fg: '#f8fafc',
+        line: '#475569',
+        accent: '#0ea5e9',
+        selection: '#334155',
+        lineHighlight: '#1e293b',
+        border: '#1e293b',
+        widgetBg: '#0f172a', // Matches --settings-bg
+        hover: '#1e293b',
+        inputBg: '#0f172a'
+      })
     });
 
     // Dark Theme (Pure Black)
@@ -304,15 +377,18 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
       base: 'vs-dark',
       inherit: true,
       rules: [],
-      colors: {
-        'editor.background': '#000000',
-        'editor.foreground': '#ffffff',
-        'editorLineNumber.foreground': '#3f3f46',
-        'editorLineNumber.activeForeground': '#71717a',
-        'editor.selectionBackground': '#27272a',
-        'editor.lineHighlightBackground': '#09090b',
-        'editorCursor.foreground': '#ffffff',
-      }
+      colors: getCommonThemeRules({
+        bg: '#000000',
+        fg: '#ffffff',
+        line: '#3f3f46',
+        accent: '#ffffff',
+        selection: '#27272a',
+        lineHighlight: '#09090b',
+        border: '#27272a',
+        widgetBg: '#09090b',
+        hover: '#27272a',
+        inputBg: '#18181b'
+      })
     });
 
     // Light Theme
@@ -324,13 +400,18 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
         { token: 'keyword', foreground: '0000ff' },
         { token: 'string', foreground: 'a31515' },
       ],
-      colors: {
-        'editor.background': '#ffffff',
-        'editor.foreground': '#0f172a',
-        'editorLineNumber.foreground': '#94a3b8',
-        'editor.lineHighlightBackground': '#f1f5f9',
-        'editor.selectionBackground': '#e2e8f0',
-      }
+      colors: getCommonThemeRules({
+        bg: '#ffffff',
+        fg: '#0f172a',
+        line: '#94a3b8',
+        accent: '#2563eb',
+        selection: '#e2e8f0',
+        lineHighlight: '#f1f5f9',
+        border: '#cbd5e1',
+        widgetBg: '#ffffff',
+        hover: '#f1f5f9',
+        inputBg: '#ffffff'
+      })
     });
 
     // Custom Theme
@@ -341,13 +422,18 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
           base: 'vs-dark',
           inherit: true,
           rules: [],
-          colors: {
-            'editor.background': customTheme.colors.bgPrimary,
-            'editor.foreground': customTheme.colors.textPrimary,
-            'editorLineNumber.foreground': customTheme.colors.textSecondary,
-            'editor.lineHighlightBackground': customTheme.colors.bgSecondary,
-            'editorCursor.foreground': customTheme.colors.accentColor,
-          }
+          colors: getCommonThemeRules({
+            bg: customTheme.colors.bgPrimary,
+            fg: customTheme.colors.textPrimary,
+            line: customTheme.colors.textSecondary,
+            accent: customTheme.colors.accentColor,
+            selection: customTheme.colors.bgSecondary, // approximate
+            lineHighlight: customTheme.colors.bgSecondary,
+            border: customTheme.colors.borderColor,
+            widgetBg: customTheme.colors.settingsBg,
+            hover: customTheme.colors.bgSecondary,
+            inputBg: customTheme.colors.inputBg
+          })
         });
       }
     }
@@ -371,13 +457,18 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
         base: 'vs-dark',
         inherit: true,
         rules: [],
-        colors: {
-          'editor.background': colors.bg,
-          'editor.foreground': colors.fg,
-          'editorLineNumber.foreground': colors.line,
-          'editorCursor.foreground': colors.accent,
-          'editor.lineHighlightBackground': colors.line + '55',
-        }
+        colors: getCommonThemeRules({
+          bg: colors.bg,
+          fg: colors.fg,
+          line: colors.line,
+          accent: colors.accent,
+          selection: colors.line, // approximate
+          lineHighlight: colors.line + '55',
+          border: colors.line,
+          widgetBg: colors.bg, // using main bg for widgets in standard themes unless defined
+          hover: colors.line + '33',
+          inputBg: colors.line + '22'
+        })
       });
     });
   };
@@ -481,6 +572,10 @@ export default function EditorPanel({ filePath, content, onChange, language }: E
               top: 16,
               bottom: 16,
             },
+            // Improved rendering config
+            renderLineHighlight: 'all',
+            renderWhitespace: 'selection',
+            smoothScrolling: true,
           }}
         />
       </div>

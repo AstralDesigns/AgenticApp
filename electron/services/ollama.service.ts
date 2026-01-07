@@ -6,6 +6,7 @@ import { BrowserWindow } from 'electron';
 import { Ollama, Message } from 'ollama';
 // @ts-ignore
 import nodeFetch from 'node-fetch';
+import { Buffer } from 'buffer';
 import { TOOL_DEFINITIONS } from './tool-definitions';
 import {
   readFile,
@@ -245,7 +246,7 @@ export class OllamaService {
       const response = await nodeFetch('http://localhost:11434/api/tags', {
         method: 'GET',
         timeout: 5000,
-      });
+      } as any);
       return { running: response.ok };
     } catch (error: any) {
       return { running: false, error: error.message || 'Ollama server not running' };

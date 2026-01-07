@@ -30,14 +30,14 @@ export interface CustomTheme {
   transparency: number;
 }
 
-interface Task {
+export interface Task {
   id: string;
   content: string;
   completed: boolean;
   timestamp: string;
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -49,14 +49,14 @@ interface ChatMessage {
   widgets?: Array<{ type: 'task' | 'terminal'; data: any }>;
 }
 
-interface DiffContent {
+export interface DiffContent {
   original: string;
   modified: string;
   filePath?: string;
   visible: boolean;
 }
 
-interface PendingDiff {
+export interface PendingDiff {
   filePath: string;
   original: string;
   modified: string;

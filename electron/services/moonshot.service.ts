@@ -12,9 +12,10 @@
  */
 import { BrowserWindow, net } from 'electron';
 import { URL } from 'url';
+import { Buffer } from 'buffer';
 
 // Detect if we're running in Node.js (test) or Electron (app)
-const isElectron = typeof process !== 'undefined' && process.versions && process.versions.electron;
+const isElectron = typeof process !== 'undefined' && (process as any).versions && (process as any).versions.electron;
 import { TOOL_DEFINITIONS } from './tool-definitions';
 import {
   readFile,

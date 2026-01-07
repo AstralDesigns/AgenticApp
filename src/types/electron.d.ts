@@ -32,6 +32,7 @@ export interface ElectronAPI {
     pullModel: (modelName: string) => Promise<{ success: boolean; error?: string; lastProgress?: string }>;
     deleteModel: (modelName: string) => Promise<{ success: boolean; error?: string }>;
     searchModels: (query: string) => Promise<{ success: boolean; models: Array<{ name: string; description?: string }> }>;
+    runModel: (modelName: string) => Promise<{ success: boolean; error?: string }>;
     onPullProgress: (callback: (data: { modelName: string; progress: string }) => void) => () => void;
   };
   on: (channel: string, callback: (event: any, ...args: any[]) => void) => void;

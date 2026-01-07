@@ -210,7 +210,7 @@ export async function searchCode(args: { search_term?: string; pattern?: string;
   try {
     const searchTerm = args.search_term || args.pattern;
     if (!searchTerm) return { error: 'No search term provided' };
-    const basePath = args.searchPath || process.cwd();
+    const basePath = args.searchPath || (process as any).cwd();
     const files = await glob('**/*.{js,ts,jsx,tsx,py,md,json,html,css,scss}', {
       cwd: basePath,
       ignore: ['node_modules/**', 'dist/**', '.git/**'],
