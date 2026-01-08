@@ -544,7 +544,7 @@ export default function Settings() {
   const tabClass = (tab: Tab) => `
     flex items-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg transition-all
     ${activeTab === tab 
-      ? 'bg-accent/10 text-accent ring-1 ring-accent/40 shadow-sm shadow-accent/10' 
+      ? 'bg-accent/10 text-accent shadow-sm shadow-accent/10' 
       : 'text-muted hover:text-foreground hover:bg-white/5'}
   `;
 
