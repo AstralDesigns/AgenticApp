@@ -978,19 +978,58 @@ ipcMain.handle('read-directory', async (_, dirPath: string) => {
     }
 
     const items = await fs.readdir(resolvedPath, { withFileTypes: true });
-    const itemsWithSizes = await Promise.all(
+    
+    // Map items and resolve symlinks
+    const itemsWithDetails = await Promise.all(
       items.map(async (item) => {
         const itemPath = path.join(resolvedPath, item.name);
-        const size = item.isFile() ? (await fs.stat(itemPath)).size : undefined;
+        let type = 'file';
+        let size = 0;
+        let isSymlink = item.isSymbolicLink();
+
+        try {
+          if (item.isDirectory()) {
+            type = 'folder';
+          } else if (item.isSymbolicLink()) {
+             // Follow the link to see if it points to a directory
+             const targetStats = await fs.stat(itemPath);
+             if (targetStats.isDirectory()) {
+               type = 'folder';
+             } else {
+               type = 'file';
+               size = targetStats.size;
+             }
+          } else {
+             // Regular file
+             type = 'file';
+             const stat = await fs.stat(itemPath);
+             size = stat.size;
+          }
+        } catch (e) {
+          // Fallback for broken links or permissions
+          console.warn(`Error getting stats for ${itemPath}:`, e);
+          type = 'file'; // Treat as file so it's visible but might error on open
+        }
+
         return {
           name: item.name,
           path: itemPath,
-          type: item.isDirectory() ? 'folder' : 'file',
+          type: type as 'folder' | 'file',
           size,
+          isSymlink
         };
       })
     );
-    return itemsWithSizes;
+    
+    // Sort items: Folders first, then alphabetically
+    itemsWithDetails.sort((a, b) => {
+        if (a.type === b.type) {
+            return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+        }
+        return a.type === 'folder' ? -1 : 1;
+    });
+
+    return itemsWithDetails;
   } catch (error: any) {
     return { error: error.message };
   }
