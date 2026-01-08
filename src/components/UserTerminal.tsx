@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
@@ -11,7 +11,7 @@ const getXtermTheme = (theme: string, customTheme?: any) => {
   
   if (theme === 'custom' && customTheme) {
     return {
-      background: '#00000000', // Fully transparent to let container bg show through
+      background: '#00000000',
       foreground: customTheme.colors.textPrimary || '#f8fafc',
       cursor: customTheme.colors.accentColor || '#0ea5e9',
       selectionBackground: customTheme.colors.accentColor + '40',
@@ -34,7 +34,6 @@ const getXtermTheme = (theme: string, customTheme?: any) => {
     };
   }
 
-  // Default Alpha/Dark theme
   if (!isLight) {
     return {
       background: '#00000000', 
@@ -60,7 +59,6 @@ const getXtermTheme = (theme: string, customTheme?: any) => {
     };
   }
 
-  // Light theme
   return {
     background: '#ffffff',
     foreground: '#0f172a',
@@ -86,45 +84,92 @@ const getXtermTheme = (theme: string, customTheme?: any) => {
 };
 
 export default function UserTerminal() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const ptyId = useRef<string | null>(null);
+  const ptyId = useRef<string>(`pty-${Date.now()}-${Math.random()}`);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
+  
   const { theme, customThemes, activeCustomThemeId, projectContext, terminalSettings } = useStore();
-  const initialized = useRef(false);
+  
+  const initializationAttempted = useRef(false);
+  const cleanupDone = useRef(false);
 
-  // Safe fit function that checks DOM state
+  // Check if container has dimensions
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const checkDimensions = () => {
+      if (containerRef.current) {
+        const { clientWidth, clientHeight } = containerRef.current;
+        if (clientWidth > 0 && clientHeight > 0) {
+          setContainerReady(true);
+        }
+      }
+    };
+    
+    // Check immediately
+    checkDimensions();
+    
+    // Also check after a short delay in case of initial render
+    const timer = setTimeout(checkDimensions, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Use IntersectionObserver to detect visibility
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting && entry.intersectionRatio > 0);
+      },
+      { threshold: 0.1 }
+    );
+    
+    observer.observe(containerRef.current);
+    intersectionObserverRef.current = observer;
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  // Safe fit function
   const fitTerminal = () => {
     if (!fitAddonRef.current || !terminalRef.current || !xtermRef.current) return;
     
-    // Only fit if the container has dimensions
-    if (terminalRef.current.clientWidth > 0 && terminalRef.current.clientHeight > 0) {
-      try {
-        fitAddonRef.current.fit();
-        
-        // Sync with PTY if active
-        if (ptyId.current && window.electronAPI?.pty) {
-          const { cols, rows } = xtermRef.current;
-          if (cols > 0 && rows > 0) {
-            window.electronAPI.pty.resize(ptyId.current, cols, rows);
-          }
+    const { clientWidth, clientHeight } = terminalRef.current;
+    if (clientWidth <= 0 || clientHeight <= 0) return;
+    
+    try {
+      fitAddonRef.current.fit();
+      
+      if (ptyId.current && window.electronAPI?.pty) {
+        const { cols, rows } = xtermRef.current;
+        if (cols > 0 && rows > 0) {
+          window.electronAPI.pty.resize(ptyId.current, cols, rows);
         }
-      } catch (e) {
-        // Suppress fit errors during transitions
       }
+    } catch (e) {
+      console.warn('[Terminal] Fit error:', e);
     }
   };
 
-  // Initialize Terminal
+  // Initialize terminal only when container is ready and visible
   useEffect(() => {
-    if (!terminalRef.current || xtermRef.current || initialized.current) return;
-    initialized.current = true;
+    if (!terminalRef.current || !containerReady || !isVisible) return;
+    if (xtermRef.current || initializationAttempted.current) return;
+    
+    initializationAttempted.current = true;
+    cleanupDone.current = false;
 
-    // Create unique ID for this session if not exists
-    if (!ptyId.current) {
-        ptyId.current = `pty-${Date.now()}`;
-    }
+    console.log('[Terminal] Initializing...');
 
     const term = new Terminal({
       cursorBlink: terminalSettings.cursorBlink,
@@ -135,133 +180,138 @@ export default function UserTerminal() {
       theme: getXtermTheme(theme, customThemes.find(t => t.id === activeCustomThemeId)),
       allowTransparency: true,
       scrollback: 5000,
-      convertEol: true, 
+      convertEol: true,
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon());
-    // NOTE: ImageAddon removed as it was causing renderer crashes ("dimensions" undefined)
 
+    // Open terminal
     term.open(terminalRef.current);
+    
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Use ResizeObserver for robust layout handling
-    const resizeObserver = new ResizeObserver(() => {
-        // Use requestAnimationFrame to debounce and ensure DOM render
-        requestAnimationFrame(() => {
-            fitTerminal();
+    // Initial fit with delay
+    setTimeout(() => {
+      fitTerminal();
+      
+      // Show ASCII art once after successful fit
+      if (terminalSettings.showAscii && terminalSettings.customAscii) {
+        const formattedAscii = terminalSettings.customAscii.replace(/\n/g, '\r\n');
+        const colorCode = '\x1b[38;2;14;165;233m';
+        const resetCode = '\x1b[0m';
+        term.write(colorCode + formattedAscii + resetCode + '\r\n\r\n');
+      }
+      
+      // Create PTY after terminal is ready
+      if (window.electronAPI?.pty) {
+        const cols = term.cols || 80;
+        const rows = term.rows || 24;
+
+        window.electronAPI.pty.create({
+          id: ptyId.current,
+          cols,
+          rows,
+          cwd: projectContext || undefined,
+        }).then(() => {
+          console.log('[Terminal] PTY created');
+          
+          // Wire up data listener
+          const disposeData = window.electronAPI.pty.onData(({ id, data }) => {
+            if (id === ptyId.current && xtermRef.current) {
+              xtermRef.current.write(data);
+            }
+          });
+
+          // Handle input
+          term.onData((data) => {
+            if (ptyId.current) {
+              window.electronAPI?.pty.write(ptyId.current, data);
+            }
+          });
+
+          // Auto-focus
+          term.focus();
+        }).catch((err) => {
+          console.error('[Terminal] Failed to create PTY:', err);
+          term.write('\r\n\x1b[31mFailed to initialize terminal session.\x1b[0m\r\n');
         });
+      }
+    }, 150);
+
+    // Setup resize observer
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        fitTerminal();
+      });
     });
     
     resizeObserver.observe(terminalRef.current);
     resizeObserverRef.current = resizeObserver;
 
-    // Initial fit attempt with delay to ensure DOM is ready
-    setTimeout(() => {
-        fitTerminal();
-    }, 100);
+    // Focus on click
+    const handleClick = () => term.focus();
+    terminalRef.current?.addEventListener('click', handleClick);
 
-    // ASCII Art
-    if (terminalSettings.showAscii && terminalSettings.customAscii) {
-       const formattedAscii = terminalSettings.customAscii.replace(/\n/g, '\r\n');
-       const colorCode = '\x1b[38;2;14;165;233m'; 
-       const resetCode = '\x1b[0m';
-       term.write(colorCode + formattedAscii + resetCode + '\r\n\r\n');
-    }
-
-    // Initialize PTY
-    if (window.electronAPI?.pty && ptyId.current) {
-      // Calculate initial dimensions based on container or default
-      const cols = term.cols || 80;
-      const rows = term.rows || 24;
-
-      window.electronAPI.pty.create({
-        id: ptyId.current,
-        cols,
-        rows,
-        cwd: projectContext || undefined,
-      }).then(() => {
-        // Wire up data listener
-        const disposeData = window.electronAPI.pty.onData(({ id, data }) => {
-          if (id === ptyId.current) {
-            term.write(data);
-          }
-        });
-
-        // Handle input
-        term.onData((data) => {
-          if (ptyId.current) {
-            window.electronAPI?.pty.write(ptyId.current, data);
-          }
-        });
-
-        // Focus terminal on click
-        terminalRef.current?.addEventListener('click', () => term.focus());
-        
-        // Auto-focus immediately
-        setTimeout(() => term.focus(), 100);
-
-        // Cleanup function for this listener
-        return () => {
-          disposeData();
-        };
-      });
-
-    } else {
-      term.write('\r\n\x1b[31mTerminal not supported in this environment.\x1b[0m\r\n');
-    }
-
-    // Cleanup on unmount
+    // Cleanup
     return () => {
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.disconnect();
-      }
-      term.dispose();
+      if (cleanupDone.current) return;
+      cleanupDone.current = true;
+      
+      console.log('[Terminal] Cleaning up...');
+      
+      resizeObserver.disconnect();
+      terminalRef.current?.removeEventListener('click', handleClick);
+      
       if (ptyId.current && window.electronAPI?.pty) {
         window.electronAPI.pty.kill(ptyId.current);
       }
+      
+      term.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
+      initializationAttempted.current = false;
     };
-  }, []); // Run once on mount
+  }, [containerReady, isVisible]);
 
-  // Update options dynamically (Hot Updates)
+  // Update terminal settings dynamically (Hot Updates)
   useEffect(() => {
-    if (xtermRef.current) {
-      const term = xtermRef.current;
-      
-      // Update options
-      term.options.fontSize = terminalSettings.fontSize;
-      term.options.cursorStyle = terminalSettings.cursorStyle;
-      term.options.cursorBlink = terminalSettings.cursorBlink;
-      term.options.fontFamily = terminalSettings.fontFamily;
-      
-      // Update theme
-      const customTheme = customThemes.find(t => t.id === activeCustomThemeId);
-      term.options.theme = getXtermTheme(theme, customTheme);
-      
-      // Trigger a refit when font options change as character size changes
-      setTimeout(() => {
-          fitTerminal();
-      }, 50);
-    }
+    if (!xtermRef.current) return;
+    
+    const term = xtermRef.current;
+    
+    // Update all options
+    term.options.fontSize = terminalSettings.fontSize;
+    term.options.cursorStyle = terminalSettings.cursorStyle;
+    term.options.cursorBlink = terminalSettings.cursorBlink;
+    term.options.fontFamily = terminalSettings.fontFamily;
+    
+    // Update theme
+    const customTheme = customThemes.find(t => t.id === activeCustomThemeId);
+    term.options.theme = getXtermTheme(theme, customTheme);
+    
+    // Refit after settings change
+    setTimeout(() => {
+      fitTerminal();
+    }, 50);
   }, [terminalSettings, theme, activeCustomThemeId, customThemes]);
 
   return (
     <div 
+      ref={containerRef}
       className="h-full w-full p-3 overflow-hidden bg-black/20"
       style={{
-          backdropFilter: 'blur(4px)',
+        backdropFilter: 'blur(4px)',
       }}
     >
       <div 
-         ref={terminalRef} 
-         className="h-full w-full rounded-lg overflow-hidden border border-white/5 shadow-inner"
-         style={{
-             padding: '4px 0 0 8px' 
-         }}
+        ref={terminalRef} 
+        className="h-full w-full rounded-lg overflow-hidden border border-white/5 shadow-inner"
+        style={{
+          padding: '4px 0 0 8px'
+        }}
       />
     </div>
   );
