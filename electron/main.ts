@@ -16,9 +16,13 @@ const projectStorePath = path.join(app.getPath('userData'), 'last-opened-project
 // --- PTY Terminal Management ---
 const ptySessions = new Map<string, pty.IPty>();
 
-function createPty(id: string, cols: number, rows: number, cwd?: string) {
-  // Use user's default shell
-  const shell = os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+function createPty(id: string, cols: number, rows: number, cwd?: string, shellPath?: string) {
+  // Use provided shell, or user's default
+  // On Windows, prefer PowerShell. On others, prefer configured shell or env shell or bash.
+  let shell = shellPath;
+  if (!shell || shell.trim() === '') {
+    shell = os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+  }
   
   let targetCwd = cwd || os.homedir();
   try {
@@ -68,7 +72,7 @@ function createPty(id: string, cols: number, rows: number, cwd?: string) {
       }
     });
     
-    console.log(`[PTY] Created session ${id} (cols: ${cols}, rows: ${rows})`);
+    console.log(`[PTY] Created session ${id} (shell: ${shell}, cols: ${cols}, rows: ${rows})`);
     return ptyProcess;
   } catch (error) {
     console.error('[PTY] Failed to create session:', error);
@@ -76,12 +80,8 @@ function createPty(id: string, cols: number, rows: number, cwd?: string) {
   }
 }
 
-// ... (rest of the file remains unchanged)
-// --- End PTY ---
-
 // Function to save the last opened project path
 async function saveLastOpenedProject(projectPath: string | null): Promise<void> {
-// ... existing code ...
   try {
     if (projectPath) {
       await fs.writeFile(projectStorePath, JSON.stringify({ path: projectPath }), 'utf-8');
@@ -595,8 +595,8 @@ ipcMain.handle('ai-backend:list-models', async () => {
 });
 
 // PTY Handlers
-ipcMain.handle('pty:create', (_, { id, cols, rows, cwd }) => {
-  createPty(id, cols, rows, cwd);
+ipcMain.handle('pty:create', (_, { id, cols, rows, cwd, shell }) => {
+  createPty(id, cols, rows, cwd, shell);
 });
 
 ipcMain.handle('pty:resize', (_, { id, cols, rows }) => {

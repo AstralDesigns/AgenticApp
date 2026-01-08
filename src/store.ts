@@ -37,6 +37,7 @@ export interface TerminalSettings {
   showAscii: boolean;
   customAscii: string;
   fontFamily: string;
+  shell: string;
 }
 
 export interface Task {
@@ -198,7 +199,7 @@ interface Store {
   clearTerminal: () => void;
   setPendingElevatedCommand: (command: { command: string; callId?: string } | null) => void;
   
-  // Canvas (tab-based file management)
+  // Canvas
   panes: FilePane[];
   activePaneId: string | null;
   openPane: (pane: FilePane) => void;
@@ -272,7 +273,8 @@ export const useStore = create<Store>()((set) => ({
  / ___ |/ / /_/ / / / / /_/ /  ___/ / /_/ /_/ / /_/ / / /_/ /
 /_/  |_/_/ .___/_/ /_/\\__,_/  /____/\\__/\\__,_/\\__,_/_/\\____/ 
         /_/                                                  `,
-    fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MesloLGS NF", "Cascadia Code", Consolas, monospace'
+    fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MesloLGS NF", "Cascadia Code", Consolas, monospace',
+    shell: ''
   },
   setTerminalSettings: (settings) => set((state) => ({
     terminalSettings: { ...state.terminalSettings, ...settings }
@@ -936,7 +938,8 @@ if (typeof window !== 'undefined') {
  / ___ |/ / /_/ / / / / /_/ /  ___/ / /_/ /_/ / /_/ / / /_/ /
 /_/  |_/_/ .___/_/ /_/\\__,_/  /____/\\__/\\__,_/\\__,_/_/\\____/ 
         /_/                                                  `,
-          fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MesloLGS NF", "Cascadia Code", Consolas, monospace'
+          fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MesloLGS NF", "Cascadia Code", Consolas, monospace',
+          shell: ''
         },
         tasks: parsed.tasks || [],
         messages: parsed.messages || [],

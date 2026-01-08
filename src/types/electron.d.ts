@@ -37,7 +37,7 @@ export interface ElectronAPI {
     onPullProgress: (callback: (data: { modelName: string; progress: string }) => void) => () => void;
   };
   pty: {
-    create: (options: { id: string; cols: number; rows: number; cwd?: string }) => Promise<void>;
+    create: (options: { id: string; cols: number; rows: number; cwd?: string; shell?: string }) => Promise<void>;
     resize: (id: string, cols: number, rows: number) => Promise<void>;
     write: (id: string, data: string) => Promise<void>;
     kill: (id: string) => Promise<void>;

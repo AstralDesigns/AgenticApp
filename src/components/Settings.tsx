@@ -480,6 +480,7 @@ export default function Settings() {
     return null;
   }
 
+  // Helper functions for provider details
   const getProviderName = () => {
     switch (activeTab) {
       case 'grok': return 'Grok';
@@ -552,7 +553,6 @@ export default function Settings() {
         className="w-full max-w-2xl rounded-xl border shadow-2xl flex flex-col max-h-[90vh] transition-colors"
         style={{ backgroundColor: 'var(--settings-bg)', borderColor: 'var(--border-color)' }}
       >
-        {/* ... (Header and Tabs code remains same) ... */}
         <div className="p-6 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--border-color)' }}>
           <h2 className="text-xl font-semibold text-foreground">Settings</h2>
           <button
@@ -603,7 +603,6 @@ export default function Settings() {
           {/* Themes Tab */}
           {activeTab === 'themes' && (
             <div className="space-y-6">
-              {/* ... (Theme UI remains same) ... */}
               <div>
                 <label className="block text-sm font-medium text-muted mb-4">
                   Interface Theme
@@ -671,7 +670,6 @@ export default function Settings() {
 
               {theme === 'custom' && (
                 <div className="space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-                  {/* ... Custom theme UI ... */}
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-muted">Custom Themes ({customThemes.length}/5)</h3>
                     <button
@@ -748,7 +746,6 @@ export default function Settings() {
 
                   {editingThemeId && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
-                      {/* ... Edit modal ... */}
                       <div 
                         className="w-full max-w-lg rounded-xl border shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto"
                         style={{ backgroundColor: 'var(--settings-bg)', borderColor: 'var(--border-color)' }}
@@ -919,6 +916,20 @@ export default function Settings() {
                     )}
                   </div>
                 </div>
+
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-muted mb-2">
+                        Shell Path (Optional)
+                    </label>
+                    <input
+                        type="text"
+                        value={localTerminalSettings.shell || ''}
+                        onChange={(e) => setLocalTerminalSettings({...localTerminalSettings, shell: e.target.value})}
+                        placeholder={navigator.platform.includes('Win') ? 'powershell.exe' : '/bin/zsh'}
+                        className="w-full px-4 py-2.5 bg-white/5 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 font-mono text-xs"
+                    />
+                    <p className="mt-1 text-[10px] text-muted">Leave empty to use system default. Requires session restart.</p>
+                </div>
                 
                 <div className="md:col-span-2 space-y-3">
                   <label className="flex items-center gap-2 text-sm font-medium text-muted cursor-pointer">
@@ -1045,7 +1056,6 @@ export default function Settings() {
           {/* Ollama Tab */}
           {activeTab === 'ollama' && (
             <div className="space-y-8">
-              {/* ... (Ollama UI remains same) ... */}
               <div className="p-4 bg-white/5 border border-border rounded-lg">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-white/10">
@@ -1192,8 +1202,7 @@ export default function Settings() {
           )}
         </div>
 
-        {/* ... (Footer Action Buttons) ... */}
-        {/* Action Buttons (Activate Provider) */}
+        {/* Footer Action Buttons */}
         {(activeTab !== 'themes' && activeTab !== 'terminal') && (
           <div className="p-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
             <button

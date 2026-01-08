@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   pty: {
-    create: (options: { id: string; cols: number; rows: number; cwd?: string }) => ipcRenderer.invoke('pty:create', options),
+    create: (options: { id: string; cols: number; rows: number; cwd?: string; shell?: string }) => ipcRenderer.invoke('pty:create', options),
     resize: (id: string, cols: number, rows: number) => ipcRenderer.invoke('pty:resize', { id, cols, rows }),
     write: (id: string, data: string) => ipcRenderer.invoke('pty:write', { id, data }),
     kill: (id: string) => ipcRenderer.invoke('pty:kill', { id }),
