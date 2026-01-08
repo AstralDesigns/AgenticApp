@@ -116,6 +116,9 @@ function handleTooltipMouseEnter(e: MouseEvent) {
   
   // Update position after a brief delay to ensure tooltip is rendered
   requestAnimationFrame(() => {
+    // Only proceed if tooltipElement still exists and hasn't been removed
+    if (!tooltipElement) return;
+
     updatePosition();
     // Update on scroll/resize
     const updateOnMove = () => {

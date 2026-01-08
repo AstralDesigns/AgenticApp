@@ -21,14 +21,20 @@ import {
   Copy,
   ExternalLink,
   Type,
+  Search,
 } from 'lucide-react';
 import { useStore } from '../store';
 import { useFileSystem, FileSystemItem } from '../services/file-system.service';
 import ContextMenu from './ContextMenu';
+import Dropdown from './ui/Dropdown';
 
 export default function Sidebar() {
   const [mode, setMode] = useState<'files' | 'project'>('files');
   const [searchTerm, setSearchTerm] = useState('');
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
+  const [projectSearchResults, setProjectSearchResults] = useState<FileSystemItem[]>([]);
+  const [isSearchingProject, setIsSearchingProject] = useState(false);
+  
   const [renameDialog, setRenameDialog] = useState<{ item: FileSystemItem | null; newName: string }>({ item: null, newName: '' });
   const [projectRoot, setProjectRoot] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -63,6 +69,44 @@ export default function Sidebar() {
   loadingFoldersRef.current = loadingFolders;
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Handle project search
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!projectSearchTerm.trim() || !projectRoot) {
+      setProjectSearchResults([]);
+      setIsSearchingProject(false);
+      return;
+    }
+
+    setIsSearchingProject(true);
+    const requestId = Date.now(); // Simple ID to track this specific search request
+    
+    searchTimeoutRef.current = setTimeout(async () => {
+      if (window.electronAPI?.findFiles) {
+        try {
+          const results = await window.electronAPI.findFiles(projectRoot, projectSearchTerm);
+          // Only update if the query hasn't changed (though cleanup usually handles this, tracking IDs is safer)
+          setProjectSearchResults(results);
+        } catch (error) {
+          console.error('Project search error:', error);
+          setProjectSearchResults([]);
+        } finally {
+          setIsSearchingProject(false);
+        }
+      } else {
+        setIsSearchingProject(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [projectSearchTerm, projectRoot]);
 
   // Load children for a folder (on-demand)
   const loadFolderChildren = useCallback(async (folderPath: string, force = false) => {
@@ -683,46 +727,101 @@ export default function Sidebar() {
     }
     
     return (
-      <div>
+      <div className="flex flex-col h-full">
         {/* Project Header with Context Mode Selector */}
-        <div className="px-2 py-1.5 border-b border-white/5 flex items-center justify-between gap-2">
+        <div className="px-2 py-1.5 border-b border-white/5 flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <FolderOpen className="w-3.5 h-3.5 mr-1.5 text-accent shrink-0" />
             <span className="text-xs font-medium text-foreground truncate" title={projectRoot}>
               {projectRoot.split('/').pop() || projectRoot}
             </span>
           </div>
-          <select
+          <Dropdown
             value={contextMode}
-            onChange={(e) => setContextMode(e.target.value as 'full' | 'smart' | 'minimal')}
-            className="text-xs border rounded px-1.5 py-0.5 focus:outline-none focus:border-accent"
-            style={{
-              backgroundColor: 'var(--settings-bg)',
-              borderColor: 'var(--border-color)',
-              color: 'var(--text-primary)',
-            }}
+            onChange={(val) => setContextMode(val as any)}
+            options={[
+              { label: 'Full', value: 'full' },
+              { label: 'Smart', value: 'smart' },
+              { label: 'Minimal', value: 'minimal' },
+            ]}
             title="Context compression mode"
-          >
-            <option value="full">Full</option>
-            <option value="smart">Smart</option>
-            <option value="minimal">Minimal</option>
-          </select>
+          />
+        </div>
+
+        {/* Project Search Bar */}
+        <div className="px-2 py-2 border-b border-white/5 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted" />
+            <input
+              type="text"
+              placeholder="Search in project..."
+              value={projectSearchTerm}
+              onChange={(e) => setProjectSearchTerm(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-md py-1 px-2 pl-7 pr-7 text-xs text-foreground placeholder-muted focus:ring-1 focus:ring-accent focus:outline-none transition-all"
+            />
+            {projectSearchTerm.length > 0 && (
+              <button
+                onClick={() => {
+                  setProjectSearchTerm('');
+                  setProjectSearchResults([]);
+                  setIsSearchingProject(false);
+                }}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/10 text-muted hover:text-foreground transition-colors"
+                data-tooltip="Clear search"
+                data-tooltip-position="bottom"
+              >
+                <X size={10} />
+              </button>
+            )}
+          </div>
         </div>
         
-        {/* Create root item from project root path */}
-        {(() => {
-          const rootItem: FileSystemItem = {
-            name: projectRoot.split('/').pop() || projectRoot,
-            path: projectRoot,
-            type: 'folder',
-          };
-
-          return (
-            <div className="p-2 space-y-0.5 overflow-y-auto flex-1">
-              <TreeItem item={rootItem} depth={0} />
+        {/* Project Content (Tree or Search Results) */}
+        <div className="flex-1 overflow-y-auto">
+          {projectSearchTerm ? (
+            // Search Results View
+            <div className="p-2 space-y-0.5">
+              {isSearchingProject ? (
+                <div className="text-xs text-muted text-center py-2">Searching...</div>
+              ) : projectSearchResults.length > 0 ? (
+                projectSearchResults.map((item) => (
+                  <div
+                    key={item.path}
+                    onClick={() => handleItemClick(item)}
+                    onContextMenu={(e) => handleRightClick(e, item)}
+                    className="flex items-center text-xs font-medium text-foreground py-1.5 px-2 rounded-md hover:bg-white/10 cursor-pointer"
+                    data-tooltip={item.path}
+                    data-tooltip-position="right"
+                  >
+                    {renderFileIcon(item)}
+                    <span className="ml-2 truncate">{item.name}</span>
+                    <span className="ml-auto text-[10px] text-muted opacity-50 truncate max-w-[80px]">
+                      {/* Handle normalized paths for display, ensuring cross-platform compatibility */}
+                      {item.path.replace(projectRoot.replace(/\\/g, '/'), '').split('/').slice(0, -1).join('/')}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-muted text-center py-2">No matches found</div>
+              )}
             </div>
-          );
-        })()}
+          ) : (
+            // Tree View
+            (() => {
+              const rootItem: FileSystemItem = {
+                name: projectRoot.split('/').pop() || projectRoot,
+                path: projectRoot,
+                type: 'folder',
+              };
+
+              return (
+                <div className="p-2 space-y-0.5">
+                  <TreeItem item={rootItem} depth={0} />
+                </div>
+              );
+            })()
+          )}
+        </div>
       </div>
     );
   };
@@ -768,18 +867,20 @@ export default function Sidebar() {
           {/* Search */}
           <div className="relative px-2 pb-2 pt-2.5 flex-shrink-0">
             <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted" />
               <input
                 type="text"
                 placeholder="Search files..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-md py-1.5 px-2 pr-7 text-xs text-foreground placeholder-muted focus:ring-1 focus:ring-accent focus:outline-none transition-all"
+                className="w-full bg-white/5 border border-white/10 rounded-md py-1.5 px-2 pl-7 pr-7 text-xs text-foreground placeholder-muted focus:ring-1 focus:ring-accent focus:outline-none transition-all"
               />
               {searchTerm.length > 0 && (
                 <button
                   onClick={() => setSearchTerm('')}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/10 text-muted hover:text-foreground transition-colors"
-                  title="Clear search"
+                  data-tooltip="Clear search"
+                  data-tooltip-position="bottom"
                 >
                   <X size={12} />
                 </button>
@@ -880,7 +981,7 @@ export default function Sidebar() {
           </div>
         </>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {renderProjectTree()}
         </div>
       )}

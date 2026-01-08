@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('move-file', sourcePath, destPath),
   trashFile: (filePath: string) => ipcRenderer.invoke('trash-file', filePath),
   renameFile: (oldPath: string, newName: string) => ipcRenderer.invoke('rename-file', oldPath, newName),
+  findFiles: (rootPath: string, query: string) => ipcRenderer.invoke('find-files', rootPath, query),
   aiBackend: {
     chat: (prompt: string, options: any) => ipcRenderer.invoke('ai-backend:chat', prompt, options),
     cancel: () => ipcRenderer.invoke('ai-backend:cancel'),
@@ -47,6 +48,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('ollama:pull-progress', handler);
       };
     },
+  },
+  pty: {
+    create: (options: { id: string; cols: number; rows: number; cwd?: string }) => ipcRenderer.invoke('pty:create', options),
+    resize: (id: string, cols: number, rows: number) => ipcRenderer.invoke('pty:resize', { id, cols, rows }),
+    write: (id: string, data: string) => ipcRenderer.invoke('pty:write', { id, data }),
+    kill: (id: string) => ipcRenderer.invoke('pty:kill', { id }),
+    onData: (callback: (data: { id: string; data: string }) => void) => {
+      const handler = (_: any, data: any) => callback(data);
+      ipcRenderer.on('pty:data', handler);
+      return () => ipcRenderer.removeListener('pty:data', handler);
+    },
+    onExit: (callback: (data: { id: string; exitCode: number }) => void) => {
+      const handler = (_: any, data: any) => callback(data);
+      ipcRenderer.on('pty:exit', handler);
+      return () => ipcRenderer.removeListener('pty:exit', handler);
+    }
   },
   project: {
     setCurrent: (projectPath: string | null) => ipcRenderer.invoke('project:set-current', projectPath),

@@ -5,14 +5,19 @@ A futuristic AI-powered code editor and workspace with Gemini integration, built
 ## Features
 
 - **Monaco Editor** with autocompletion and CursorAI-style widgets
-- **Gemini AI Integration** via native Electron IPC (no Python backend required)
-- **Chat Panel** with streaming responses and context attachment
-- **Task Management** with AI-powered task analysis
+- **Multi-Provider AI Integration** via native Electron IPC:
+  - **Google Gemini** (Native API)
+  - **xAI Grok** (OpenAI-compatible)
+  - **Groq** (OpenAI-compatible, Llama 3)
+  - **Moonshot AI** (Kimi, OpenAI-compatible)
+  - **Ollama** (Local LLM support for privacy and offline use)
+- **Chat Panel** with streaming responses, context attachment, and tool execution
+- **Task Management** with AI-powered task analysis and dynamic planning
 - **Diff Widget** for reviewing generated code changes
 - **Agent Terminal** with permission prompts for elevated commands
-- **Dual Panel Modes**: File navigation and project mode
+- **Dual Panel Modes**: File navigation and Project Explorer with search
 - **Image & File Context** attachment with preview
-- **Multiple Themes**: Light, Dark, and Aether gradient
+- **Multiple Themes**: Light, Dark, Aether gradient, and custom theming support
 - **Cross-platform**: Linux, macOS, and Windows
 
 ## Setup
@@ -20,7 +25,7 @@ A futuristic AI-powered code editor and workspace with Gemini integration, built
 ### Prerequisites
 
 - Node.js 20+ and npm
-- Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+- An API key from one of the supported providers (Gemini, Grok, Groq, Moonshot) OR a local Ollama installation.
 
 ### Installation
 
@@ -34,9 +39,10 @@ cd ~/alpha-studio
 npm install
 ```
 
-3. Configure API key:
+3. Configure API keys:
    - Open the app and go to Settings (gear icon)
-   - Enter your Gemini API key
+   - Select your preferred AI provider
+   - Enter your API key (or configure Ollama for local models)
 
 ### Development
 
@@ -47,7 +53,7 @@ npm run dev
 
 This will start:
 - Vite dev server on http://localhost:5173
-- Electron app (Gemini API integrated directly via IPC)
+- Electron app
 
 ### Building
 
@@ -66,24 +72,24 @@ npm run package:win   # Windows only
 
 ## Usage
 
-1. **Configure API Key**: Open Settings (gear icon) and enter your Gemini API key
-2. **Open Files**: Use the sidebar to navigate and open files
-3. **Chat with AI**: Use the chat panel to ask questions or request code changes
-4. **Manage Tasks**: Add tasks in the task panel - the AI can help plan and track progress
-5. **Review Changes**: When AI suggests changes, review them in the diff widget
-6. **Execute Commands**: Use the terminal panel to run commands (with permission prompts for elevated access)
+1. **Configure AI**: Open Settings to set up your preferred AI model and provider.
+2. **Open Project**: Use the Project view to open a folder and search for files.
+3. **Chat with AI**: Use the chat panel to ask questions, generate code, or execute complex tasks.
+4. **Manage Tasks**: Add tasks in the task panel - the AI can create plans and track progress.
+5. **Review Changes**: When AI suggests changes (using `write_file`), review them in the diff widget before applying.
+6. **Execute Commands**: Use the terminal panel to run commands safely.
 
 ## Project Structure
 
 ```
 alpha-studio/
 ├── electron/              # Electron main process
-│   ├── services/          # Gemini service, file operations, agentic loop
+│   ├── services/          # AI providers, file operations, agentic loop
 │   ├── main.ts            # Main process with IPC handlers
 │   └── preload.ts         # Preload script for secure IPC
 ├── src/                   # React frontend
-│   ├── components/        # React components
-│   ├── services/          # Frontend services (Gemini API, etc.)
+│   ├── components/        # React components (Chat, Editor, Sidebar, etc.)
+│   ├── services/          # Frontend services
 │   ├── store.ts           # Zustand state management
 │   └── types/             # TypeScript types
 └── public/                # Static assets
@@ -93,7 +99,7 @@ alpha-studio/
 
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Monaco Editor
 - **Desktop**: Electron with native Node.js APIs
-- **AI Integration**: @google/genai SDK (native TypeScript/Node.js)
+- **AI Integration**: Custom provider adapters for Gemini, OpenAI-compatible APIs, and Ollama
 - **File Operations**: Node.js fs module (native)
 - **State**: Zustand
 - **UI**: Lucide React icons, Framer Motion

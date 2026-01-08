@@ -4,15 +4,84 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import { spawn, exec } from 'child_process';
 import { watch, FSWatcher } from 'fs';
+import { glob } from 'glob';
 import { AIBackendService } from './services/ai-backend.service';
+import * as pty from 'node-pty';
 
 const isDev = !app.isPackaged;
 
 // Path to store the last opened project
 const projectStorePath = path.join(app.getPath('userData'), 'last-opened-project.json');
 
+// --- PTY Terminal Management ---
+const ptySessions = new Map<string, pty.IPty>();
+
+function createPty(id: string, cols: number, rows: number, cwd?: string) {
+  // Use user's default shell
+  const shell = os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+  
+  let targetCwd = cwd || os.homedir();
+  try {
+    if (cwd && cwd.startsWith('~')) {
+      targetCwd = cwd.replace(/^~/, os.homedir());
+    }
+  } catch (e) {
+    targetCwd = os.homedir();
+  }
+
+  // Ensure TERM is explicitly set to xterm-256color to satisfy fish/zsh capability checks
+  // COLORTERM=truecolor enables 24-bit color support
+  const env = {
+    ...process.env,
+    TERM: 'xterm-256color',
+    COLORTERM: 'truecolor',
+  };
+
+  try {
+    // Check if session exists to avoid duplicates
+    if (ptySessions.has(id)) {
+      console.log(`[PTY] Session ${id} already exists, killing it.`);
+      ptySessions.get(id)?.kill();
+      ptySessions.delete(id);
+    }
+
+    const ptyProcess = pty.spawn(shell, [], {
+      name: 'xterm-256color',
+      cols: cols || 80,
+      rows: rows || 24,
+      cwd: targetCwd,
+      env: env as any
+    });
+
+    ptySessions.set(id, ptyProcess);
+
+    ptyProcess.onData((data) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('pty:data', { id, data });
+      }
+    });
+
+    ptyProcess.onExit(({ exitCode, signal }) => {
+      ptySessions.delete(id);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('pty:exit', { id, exitCode });
+      }
+    });
+    
+    console.log(`[PTY] Created session ${id} (cols: ${cols}, rows: ${rows})`);
+    return ptyProcess;
+  } catch (error) {
+    console.error('[PTY] Failed to create session:', error);
+    return null;
+  }
+}
+
+// ... (rest of the file remains unchanged)
+// --- End PTY ---
+
 // Function to save the last opened project path
 async function saveLastOpenedProject(projectPath: string | null): Promise<void> {
+// ... existing code ...
   try {
     if (projectPath) {
       await fs.writeFile(projectStorePath, JSON.stringify({ path: projectPath }), 'utf-8');
@@ -170,11 +239,51 @@ async function copyDirectory(source: string, dest: string): Promise<void> {
 let mainWindow: BrowserWindow | null = null;
 let projectWatcher: FSWatcher | null = null;
 let currentProjectPath: string | null = null;
+let projectFilesCache: string[] = []; // In-memory cache of project files
+let scanPromise: Promise<void> | null = null; // Track active scan
 
 // Debouncing for file watcher events
 const fileWatcherDebounceMap = new Map<string, any>();
 const processedEvents = new Set<string>();
 const DEBOUNCE_DELAY = 150; // ms
+
+// Function to scan and cache project files
+async function scanProjectFiles(rootPath: string) {
+  // If already scanning, return the existing promise
+  if (scanPromise) return scanPromise;
+
+  scanPromise = (async () => {
+    try {
+      console.log('[Electron] Scanning project files for cache:', rootPath);
+      let resolvedRoot = rootPath;
+      if (rootPath === '~' || rootPath.startsWith('~/')) {
+        resolvedRoot = rootPath.replace(/^~/, os.homedir());
+      }
+      
+      // Normalize path separators to forward slashes for glob
+      // This is crucial for Windows support where glob might struggle with backslashes in CWD
+      const globRoot = resolvedRoot.replace(/\\/g, '/');
+
+      const files = await glob('**/*', {
+        cwd: globRoot,
+        nodir: true,
+        dot: true, // Include dotfiles
+        ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/.DS_Store', '**/build/**', '**/.next/**', '**/.cache/**'],
+        absolute: false
+      });
+      
+      projectFilesCache = files;
+      console.log(`[Electron] Cached ${files.length} files`);
+    } catch (error) {
+      console.error('[Electron] Failed to scan project files:', error);
+      if (projectFilesCache.length === 0) projectFilesCache = [];
+    } finally {
+      scanPromise = null;
+    }
+  })();
+
+  return scanPromise;
+}
 
 function createWindow() {
   const preloadPath = path.join(__dirname, 'preload.js');
@@ -210,6 +319,56 @@ function createWindow() {
   mainWindow.show();
   mainWindow.focus();
 
+  // Native Context Menu Handler for Spellchecking
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const menu = new Menu();
+
+    // Spellcheck Suggestions
+    if (params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
+      for (const suggestion of params.dictionarySuggestions) {
+        menu.append(new MenuItem({
+          label: suggestion,
+          click: () => mainWindow?.webContents.replaceMisspelling(suggestion)
+        }));
+      }
+      menu.append(new MenuItem({ type: 'separator' }));
+    } else if (params.misspelledWord) {
+      menu.append(new MenuItem({
+        label: 'No suggestions',
+        enabled: false
+      }));
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    // Standard Editing Actions
+    menu.append(new MenuItem({ role: 'undo' }));
+    menu.append(new MenuItem({ role: 'redo' }));
+    menu.append(new MenuItem({ type: 'separator' }));
+    menu.append(new MenuItem({ role: 'cut' }));
+    menu.append(new MenuItem({ role: 'copy' }));
+    menu.append(new MenuItem({ role: 'paste' }));
+    menu.append(new MenuItem({ role: 'delete' }));
+    menu.append(new MenuItem({ type: 'separator' }));
+    menu.append(new MenuItem({ role: 'selectAll' }));
+
+    // Custom Actions (only for editable fields)
+    if (params.isEditable) {
+      menu.append(new MenuItem({ type: 'separator' }));
+      
+      menu.append(new MenuItem({
+        label: 'Insert Emoji',
+        click: () => mainWindow?.webContents.send('context-menu-command', 'insert-emoji', { x: params.x, y: params.y })
+      }));
+
+      menu.append(new MenuItem({
+        label: 'Change Case',
+        click: () => mainWindow?.webContents.send('context-menu-command', 'change-case')
+      }));
+    }
+
+    menu.popup();
+  });
+
   // Window is already shown, but ensure it stays visible
   const ensureVisible = () => {
     if (mainWindow && !mainWindow.isVisible()) {
@@ -228,6 +387,9 @@ function createWindow() {
   // Clear interval when window closes
   mainWindow.on('closed', () => {
     clearInterval(visibilityCheck);
+    // Cleanup PTYs
+    ptySessions.forEach(p => p.kill());
+    ptySessions.clear();
   });
 
   // Handle page load errors
@@ -407,7 +569,7 @@ function createWindow() {
   });
 }
 
-// Register IPC handlers
+// Register IPC handlers for AI
 ipcMain.handle('ai-backend:chat', async (_, prompt: string, options: any) => {
   try {
     await aiBackendService.chatStream(prompt, options);
@@ -430,6 +592,33 @@ ipcMain.handle('ai-backend:cancel', () => {
 
 ipcMain.handle('ai-backend:list-models', async () => {
   return await aiBackendService.listModels();
+});
+
+// PTY Handlers
+ipcMain.handle('pty:create', (_, { id, cols, rows, cwd }) => {
+  createPty(id, cols, rows, cwd);
+});
+
+ipcMain.handle('pty:resize', (_, { id, cols, rows }) => {
+  const pty = ptySessions.get(id);
+  if (pty) {
+    pty.resize(cols, rows);
+  }
+});
+
+ipcMain.handle('pty:write', (_, { id, data }) => {
+  const pty = ptySessions.get(id);
+  if (pty) {
+    pty.write(data);
+  }
+});
+
+ipcMain.handle('pty:kill', (_, { id }) => {
+  const pty = ptySessions.get(id);
+  if (pty) {
+    pty.kill();
+    ptySessions.delete(id);
+  }
 });
 
 // Ollama Model Management IPC Handlers
@@ -499,17 +688,22 @@ function setupProjectWatcher(projectPath: string | null) {
   }
   
   currentProjectPath = projectPath;
+  projectFilesCache = []; // Clear cache on project switch
   
   if (!projectPath || !mainWindow) return;
   
   try {
     let resolvedPath = projectPath.startsWith('~') ? projectPath.replace(/^~/, os.homedir()) : projectPath;
     
+    // Perform initial scan to populate cache
+    // Don't await here to avoid blocking setup
+    scanProjectFiles(resolvedPath);
+    
     projectWatcher = watch(resolvedPath, { recursive: true }, (eventType, filename) => {
       if (!mainWindow || !filename) return;
       
       const filePath = path.join(resolvedPath, filename);
-      const relativePath = path.relative(resolvedPath, filePath);
+      const relativePath = path.relative(resolvedPath, filePath).split(path.sep).join('/');
       const eventKey = `${eventType}:${relativePath}`;
       
       // Clear existing debounce timer for this event
@@ -528,12 +722,11 @@ function setupProjectWatcher(projectPath: string | null) {
         
         processedEvents.add(eventKey);
         
-        // Determine event type
+        // Determine event type and update cache
         if (eventType === 'rename') {
           // Check if this is part of a rename operation we're already handling
           const isRenameOperation = processedEvents.has(`rename:${relativePath}`);
           if (isRenameOperation) {
-            // This is from our explicit rename, skip watcher event
             fileWatcherDebounceMap.delete(eventKey);
             return;
           }
@@ -541,19 +734,24 @@ function setupProjectWatcher(projectPath: string | null) {
           // Check if file exists to determine if it was created or deleted
           fs.access(filePath).then(() => {
             // File exists - it was created or renamed to this
+            if (!projectFilesCache.includes(relativePath)) {
+              projectFilesCache.push(relativePath);
+            }
             mainWindow?.webContents.send('file-system:created', {
               path: projectPath.startsWith('~') ? `~/${relativePath}` : relativePath,
               resolvedPath: filePath
             });
-            // Clean up after a delay
             setTimeout(() => processedEvents.delete(eventKey), 1000);
           }).catch(() => {
             // File doesn't exist - it was deleted
+            const idx = projectFilesCache.indexOf(relativePath);
+            if (idx !== -1) {
+              projectFilesCache.splice(idx, 1);
+            }
             mainWindow?.webContents.send('file-system:deleted', {
               path: projectPath.startsWith('~') ? `~/${relativePath}` : relativePath,
               resolvedPath: filePath
             });
-            // Clean up after a delay
             setTimeout(() => processedEvents.delete(eventKey), 1000);
           });
         } else if (eventType === 'change') {
@@ -562,7 +760,6 @@ function setupProjectWatcher(projectPath: string | null) {
             path: projectPath.startsWith('~') ? `~/${relativePath}` : relativePath,
             resolvedPath: filePath
           });
-          // Clean up after a delay
           setTimeout(() => processedEvents.delete(eventKey), 1000);
         }
         
@@ -628,7 +825,16 @@ ipcMain.handle('rename-file', async (_, oldPath: string, newName: string) => {
     // Mark this as a rename operation to suppress duplicate watcher events
     const relativeOldPath = currentProjectPath ? path.relative(currentProjectPath.replace(/^~/, os.homedir()), resolvedOldPath) : '';
     const relativeNewPath = currentProjectPath ? path.relative(currentProjectPath.replace(/^~/, os.homedir()), newPath) : '';
+    
     if (relativeOldPath && relativeNewPath && currentProjectPath) {
+      // Update cache
+      const idx = projectFilesCache.indexOf(relativeOldPath.split(path.sep).join('/'));
+      if (idx !== -1) {
+        projectFilesCache[idx] = relativeNewPath.split(path.sep).join('/');
+      } else {
+        projectFilesCache.push(relativeNewPath.split(path.sep).join('/'));
+      }
+
       // Mark both old and new paths as being renamed to suppress watcher events
       processedEvents.add(`rename:${relativeOldPath}`);
       processedEvents.add(`rename:${relativeNewPath}`);
@@ -652,6 +858,77 @@ ipcMain.handle('rename-file', async (_, oldPath: string, newName: string) => {
   } catch (error: any) {
     console.error('[Electron] Failed to rename file:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// IPC handler for searching files in a project
+ipcMain.handle('find-files', async (_, rootPath: string, query: string) => {
+  try {
+    if (!rootPath) return [];
+    if (!query) return [];
+
+    let resolvedRoot = rootPath;
+    if (rootPath === '~' || rootPath.startsWith('~/')) {
+      resolvedRoot = rootPath.replace(/^~/, os.homedir());
+    }
+
+    // If cache is empty and we have a project path, try scanning (fallback)
+    if (projectFilesCache.length === 0) {
+      if (currentProjectPath) {
+        // If we are searching within the active project (likely), reuse scanning logic
+        // This is safe even if rootPath != currentProjectPath strictly string-wise if it resolves to same
+        // But for safety, we'll scan the requested rootPath if it differs substantially
+        await scanProjectFiles(currentProjectPath);
+      } else {
+        // Scan the requested path if no project is active or mismatch
+        await scanProjectFiles(rootPath);
+      }
+    } else if (scanPromise) {
+      // Wait for ongoing scan to complete
+      await scanPromise;
+    }
+
+    const q = query.toLowerCase();
+    
+    // Simple fuzzy search on cached files
+    const matches = projectFilesCache
+      .filter(file => {
+        const name = path.basename(file).toLowerCase();
+        const fullPath = file.toLowerCase();
+        
+        // Match name or full path
+        if (name.includes(q)) return true;
+        
+        // Advanced fuzzy: check if characters appear in order
+        // Only if query is short enough to warrant it
+        if (q.length > 2) {
+          let searchIdx = 0;
+          let fileIdx = 0;
+          while (searchIdx < q.length && fileIdx < fullPath.length) {
+            if (q[searchIdx] === fullPath[fileIdx]) {
+              searchIdx++;
+            }
+            fileIdx++;
+          }
+          return searchIdx === q.length;
+        }
+        
+        return false;
+      })
+      .slice(0, 100) // Limit results
+      .map(file => {
+        // file from glob is relative to resolvedRoot and uses forward slashes
+        return {
+          name: path.basename(file),
+          path: path.join(rootPath, file).replace(/\\/g, '/'),
+          type: 'file' as const
+        };
+      });
+
+    return matches;
+  } catch (error: any) {
+    console.error('[Electron] Find files error:', error);
+    return [];
   }
 });
 

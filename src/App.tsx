@@ -126,9 +126,9 @@ function App() {
             style={{ width: `${sidebarWidth}px` }}
           >
             <div 
-              className="resize-handle resize-handle-right"
+              className="absolute top-0 bottom-0 right-0 w-1 cursor-col-resize z-[100] hover:bg-accent/50 active:bg-accent transition-colors"
               onMouseDown={(e) => startResize(e, 'sidebar')}
-            ></div>
+            />
             <Sidebar />
           </aside>
 
@@ -137,10 +137,14 @@ function App() {
             className={`chat-panel ${chatVisible ? 'chat-visible' : ''}`}
             style={{ width: `${chatWidth}px` }}
           >
+            {/* 
+                Increased z-index to 100 to ensure it's above panel content.
+                Increased width to 6px (w-1.5) and adjusted left position to -3px for better grab area.
+            */}
             <div 
-              className="resize-handle resize-handle-left"
+              className="absolute top-0 bottom-0 -left-[3px] w-1.5 cursor-col-resize z-[100] hover:bg-accent/50 active:bg-accent transition-colors"
               onMouseDown={(e) => startResize(e, 'chat')}
-            ></div>
+            />
             <ChatPanel />
           </aside>
 

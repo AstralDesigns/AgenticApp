@@ -1,8 +1,9 @@
-import { X, Save, Palette, Cpu, AlertCircle, ExternalLink, Key, ChevronDown, Plus, Trash2, Edit2, Check, Zap, Globe, Brain, Moon, Server, Search, Download, Loader2 } from 'lucide-react';
-import { useStore, CustomTheme } from '../store';
+import { X, Save, Palette, Cpu, ExternalLink, Key, ChevronDown, Plus, Trash2, Edit2, Check, Zap, Globe, Brain, Moon, Server, Search, Download, Loader2, TerminalSquare } from 'lucide-react';
+import { useStore, CustomTheme, TerminalSettings } from '../store';
 import { useState, useEffect, useRef } from 'react';
+import Dropdown from './ui/Dropdown';
 
-type Tab = 'themes' | 'groq' | 'grok' | 'gemini' | 'moonshot' | 'ollama';
+type Tab = 'themes' | 'terminal' | 'groq' | 'grok' | 'gemini' | 'moonshot' | 'ollama';
 
 const DEFAULT_CUSTOM_THEME: Omit<CustomTheme, 'id'> = {
   name: 'New Custom Theme',
@@ -27,6 +28,18 @@ const DEFAULT_CUSTOM_THEME: Omit<CustomTheme, 'id'> = {
   },
   transparency: 0.3,
 };
+
+const POPULAR_FONTS = [
+  { label: 'JetBrainsMono Nerd Font', value: '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace' },
+  { label: 'FiraCode Nerd Font', value: '"FiraCode Nerd Font", "Fira Code", monospace' },
+  { label: 'MesloLGS NF', value: '"MesloLGS NF", monospace' },
+  { label: 'Cascadia Code', value: '"Cascadia Code", monospace' },
+  { label: 'Hack Nerd Font', value: '"Hack Nerd Font", "Hack", monospace' },
+  { label: 'SauceCodePro Nerd Font', value: '"SauceCodePro Nerd Font", "Source Code Pro", monospace' },
+  { label: 'RobotoMono Nerd Font', value: '"RobotoMono Nerd Font", "Roboto Mono", monospace' },
+  { label: 'UbuntuMono Nerd Font', value: '"UbuntuMono Nerd Font", "Ubuntu Mono", monospace' },
+  { label: 'Monospaced', value: 'monospace' },
+];
 
 const STANDARD_THEMES = [
   { id: 'catppuccin-mocha', name: 'Catppuccin Mocha' },
@@ -157,6 +170,27 @@ const MOONSHOT_MODELS = [
   },
 ];
 
+const THEME_COLORS: { label: string; key: keyof CustomTheme['colors'] }[] = [
+  { label: 'Primary BG', key: 'bgPrimary' },
+  { label: 'Secondary BG', key: 'bgSecondary' },
+  { label: 'Text Primary', key: 'textPrimary' },
+  { label: 'Text Secondary', key: 'textSecondary' },
+  { label: 'Border Color', key: 'borderColor' },
+  { label: 'Accent Color', key: 'accentColor' },
+  { label: 'Sidebar BG', key: 'sidebarBg' },
+  { label: 'Chat BG', key: 'chatBg' },
+  { label: 'Header BG', key: 'headerBg' },
+  { label: 'Input BG', key: 'inputBg' },
+  { label: 'Input Border', key: 'inputBorder' },
+  { label: 'User Msg BG', key: 'userMsgBg' },
+  { label: 'User Msg Border', key: 'userMsgBorder' },
+  { label: 'Pulse Indicator', key: 'indicatorColor' },
+  { label: 'Button BG', key: 'buttonBg' },
+  { label: 'Button Text', key: 'buttonText' },
+  { label: 'Settings BG', key: 'settingsBg' },
+  { label: 'Context Menu Hover', key: 'contextMenuHoverBg' },
+];
+
 export default function Settings() {
   const {
     showSettings,
@@ -186,9 +220,11 @@ export default function Settings() {
     moonshotApiKey,
     setMoonshotApiKey,
     ollamaModels,
+    terminalSettings,
+    setTerminalSettings
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<Tab>(aiProvider);
+  const [activeTab, setActiveTab] = useState<Tab>(aiProvider as Tab);
   const [deepseekApiKeyInput, setDeepseekApiKeyInput] = useState(deepseekApiKey);
   const [groqApiKeyInput, setGroqApiKeyInput] = useState(groqApiKey);
   const [grokApiKeyInput, setGrokApiKeyInput] = useState(grokApiKey);
@@ -200,6 +236,10 @@ export default function Settings() {
   const [showReplacePrompt, setShowReplacePrompt] = useState(false);
   const [showStandardDropdown, setShowStandardDropdown] = useState(false);
   
+  // Terminal Settings State
+  const [localTerminalSettings, setLocalTerminalSettings] = useState<TerminalSettings>(terminalSettings);
+  const [isCustomFont, setIsCustomFont] = useState(false);
+
   // Ollama-specific state
   const [ollamaSearchQuery, setOllamaSearchQuery] = useState('');
   const [ollamaSearchResults, setOllamaSearchResults] = useState<Array<{ name: string; description?: string }>>([]);
@@ -210,6 +250,7 @@ export default function Settings() {
   
   const settingsRef = useRef<HTMLDivElement>(null);
   const standardDropdownRef = useRef<HTMLDivElement>(null);
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   const getCurrentModels = () => {
     switch (activeTab) {
@@ -229,12 +270,20 @@ export default function Settings() {
     setGeminiApiKeyInput(geminiApiKey);
     setMoonshotApiKeyInput(moonshotApiKey);
     setSelectedModel(aiBackendModel);
-    setActiveTab(aiProvider);
-  }, [deepseekApiKey, groqApiKey, grokApiKey, geminiApiKey, moonshotApiKey, aiBackendModel, showSettings, aiProvider]);
+    setLocalTerminalSettings(terminalSettings);
+    // Don't switch tab automatically if user is on terminal or themes
+    if (aiProvider === activeTab) {
+      setActiveTab(aiProvider);
+    }
+    
+    // Check if current font is in the popular list
+    const isPopular = POPULAR_FONTS.some(f => f.value === terminalSettings.fontFamily);
+    setIsCustomFont(!isPopular);
+  }, [deepseekApiKey, groqApiKey, grokApiKey, geminiApiKey, moonshotApiKey, aiBackendModel, showSettings, aiProvider, terminalSettings]);
 
   // Sync selectedModel when switching provider tabs
   useEffect(() => {
-    if (activeTab !== 'themes') {
+    if (activeTab !== 'themes' && activeTab !== 'terminal') {
       const currentModels = getCurrentModels();
       if (Array.isArray(currentModels)) {
         const modelForProvider = currentModels.find(m => m.id === selectedModel);
@@ -340,27 +389,28 @@ export default function Settings() {
     setGrokApiKey(grokApiKeyInput);
     setGeminiApiKey(geminiApiKeyInput);
     setMoonshotApiKey(moonshotApiKeyInput);
+    setTerminalSettings(localTerminalSettings);
     
-    const providerToSet = activeTab === 'themes' ? aiProvider : activeTab as 'grok' | 'groq' | 'gemini' | 'moonshot' | 'ollama';
-    setAIProvider(providerToSet);
-    
-    if (activeTab !== 'themes') {
-      const currentModels = getCurrentModels();
-      const modelBelongsToProvider = currentModels.some(m => m.id === selectedModel);
-      const finalModel = modelBelongsToProvider ? selectedModel : (currentModels.find(m => (m as any).recommended)?.id || currentModels[0]?.id);
-      
-      if (finalModel) {
-        setAIBackendModel(finalModel);
+    if (activeTab !== 'themes' && activeTab !== 'terminal') {
+        const providerToSet = activeTab as 'grok' | 'groq' | 'gemini' | 'moonshot' | 'ollama';
+        setAIProvider(providerToSet);
         
-        // If Ollama model is selected, run/load it into memory and persist selection
-        if (activeTab === 'ollama' && window.electronAPI?.ollama?.runModel) {
-          console.log('[Settings] Loading and persisting Ollama model:', finalModel);
-          const result = await window.electronAPI.ollama.runModel(finalModel);
-          if (!result.success) {
-            console.error('[Settings] Failed to load Ollama model:', result.error);
-          }
+        const currentModels = getCurrentModels();
+        const modelBelongsToProvider = currentModels.some(m => m.id === selectedModel);
+        const finalModel = modelBelongsToProvider ? selectedModel : (currentModels.find(m => (m as any).recommended)?.id || currentModels[0]?.id);
+        
+        if (finalModel) {
+            setAIBackendModel(finalModel);
+            
+            // If Ollama model is selected, run/load it into memory and persist selection
+            if (activeTab === 'ollama' && window.electronAPI?.ollama?.runModel) {
+            console.log('[Settings] Loading and persisting Ollama model:', finalModel);
+            const result = await window.electronAPI.ollama.runModel(finalModel);
+            if (!result.success) {
+                console.error('[Settings] Failed to load Ollama model:', result.error);
+            }
+            }
         }
-      }
     }
     
     setShowSettings(false);
@@ -398,6 +448,14 @@ export default function Settings() {
     setEditingThemeId('new');
     setTempTheme(DEFAULT_CUSTOM_THEME);
     setShowReplacePrompt(false);
+  };
+
+  const handleTabsWheel = (e: React.WheelEvent) => {
+    if (tabsContainerRef.current) {
+      e.preventDefault();
+      const scrollAmount = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+      tabsContainerRef.current.scrollLeft += scrollAmount;
+    }
   };
 
   useEffect(() => {
@@ -494,6 +552,7 @@ export default function Settings() {
         className="w-full max-w-2xl rounded-xl border shadow-2xl flex flex-col max-h-[90vh] transition-colors"
         style={{ backgroundColor: 'var(--settings-bg)', borderColor: 'var(--border-color)' }}
       >
+        {/* ... (Header and Tabs code remains same) ... */}
         <div className="p-6 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--border-color)' }}>
           <h2 className="text-xl font-semibold text-foreground">Settings</h2>
           <button
@@ -504,80 +563,47 @@ export default function Settings() {
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b shrink-0 overflow-x-auto" style={{ borderColor: 'var(--border-color)' }}>
-          <button
-            onClick={() => setActiveTab('themes')}
-            className={`px-4 py-3 flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
-              activeTab === 'themes'
-                ? 'text-accent border-b-2 border-accent bg-white/5'
-                : 'text-muted hover:text-foreground hover:bg-white/5'
-            }`}
+        {/* Tab Navigation - Compact and Scrollable */}
+        <div className="flex-shrink-0 z-20 px-2 py-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
+          <div 
+            ref={tabsContainerRef}
+            className="flex items-center overflow-x-auto overflow-y-hidden scrollbar-hide flex-nowrap gap-1"
+            onWheel={handleTabsWheel}
           >
-            <Palette className="w-4 h-4" />
-            Themes
-          </button>
-          <button
-            onClick={() => setActiveTab('grok')}
-            className={`px-4 py-3 flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
-              activeTab === 'grok'
-                ? 'text-accent border-b-2 border-accent bg-white/5'
-                : 'text-muted hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <Brain className="w-4 h-4" />
-            Grok
-          </button>
-          <button
-            onClick={() => setActiveTab('groq')}
-            className={`px-4 py-3 flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
-              activeTab === 'groq'
-                ? 'text-accent border-b-2 border-accent bg-white/5'
-                : 'text-muted hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <Zap className="w-4 h-4" />
-            Groq
-          </button>
-          <button
-            onClick={() => setActiveTab('gemini')}
-            className={`px-4 py-3 flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
-              activeTab === 'gemini'
-                ? 'text-accent border-b-2 border-accent bg-white/5'
-                : 'text-muted hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            Gemini
-          </button>
-          <button
-            onClick={() => setActiveTab('moonshot')}
-            className={`px-4 py-3 flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
-              activeTab === 'moonshot'
-                ? 'text-accent border-b-2 border-accent bg-white/5'
-                : 'text-muted hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <Moon className="w-4 h-4" />
-            Moonshot
-          </button>
-          <button
-            onClick={() => setActiveTab('ollama')}
-            className={`px-4 py-3 flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
-              activeTab === 'ollama'
-                ? 'text-accent border-b-2 border-accent bg-white/5'
-                : 'text-muted hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <Server className="w-4 h-4" />
-            Ollama
-          </button>
+            {[
+                { id: 'themes', label: 'Themes', icon: <Palette className="w-3.5 h-3.5" /> },
+                { id: 'terminal', label: 'Terminal', icon: <TerminalSquare className="w-3.5 h-3.5" /> },
+                { id: 'grok', label: 'Grok', icon: <Brain className="w-3.5 h-3.5" /> },
+                { id: 'groq', label: 'Groq', icon: <Zap className="w-3.5 h-3.5" /> },
+                { id: 'gemini', label: 'Gemini', icon: <Globe className="w-3.5 h-3.5" /> },
+                { id: 'moonshot', label: 'Moonshot', icon: <Moon className="w-3.5 h-3.5" /> },
+                { id: 'ollama', label: 'Ollama', icon: <Server className="w-3.5 h-3.5" /> },
+            ].map((tab) => (
+                <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as Tab)}
+                    className={`
+                        flex items-center px-3 py-1.5 text-xs font-medium rounded-md
+                        transition-all flex-shrink-0 cursor-pointer
+                        backdrop-blur-sm border
+                        ${activeTab === tab.id 
+                        ? 'bg-white/10 text-foreground shadow-sm border-white/20' 
+                        : 'bg-white/5 text-muted hover:bg-white/10 border-white/5'
+                        }
+                    `}
+                >
+                    <span className={`mr-1.5 ${activeTab === tab.id ? 'text-accent' : ''}`}>{tab.icon}</span>
+                    <span className="whitespace-nowrap">{tab.label}</span>
+                </button>
+            ))}
+          </div>
         </div>
 
         <div className={`p-6 overflow-y-auto flex-1 custom-scrollbar ${activeTab === 'themes' ? 'min-h-[600px]' : ''}`}>
           {/* Themes Tab */}
           {activeTab === 'themes' && (
             <div className="space-y-6">
+              {/* ... (Theme UI remains same) ... */}
               <div>
                 <label className="block text-sm font-medium text-muted mb-4">
                   Interface Theme
@@ -645,6 +671,7 @@ export default function Settings() {
 
               {theme === 'custom' && (
                 <div className="space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
+                  {/* ... Custom theme UI ... */}
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-muted">Custom Themes ({customThemes.length}/5)</h3>
                     <button
@@ -721,6 +748,7 @@ export default function Settings() {
 
                   {editingThemeId && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+                      {/* ... Edit modal ... */}
                       <div 
                         className="w-full max-w-lg rounded-xl border shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto"
                         style={{ backgroundColor: 'var(--settings-bg)', borderColor: 'var(--border-color)' }}
@@ -746,44 +774,32 @@ export default function Settings() {
                           </div>
 
                           <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                            {[
-                              { label: 'Primary BG', key: 'bgPrimary' },
-                              { label: 'Secondary BG', key: 'bgSecondary' },
-                              { label: 'Text Primary', key: 'textPrimary' },
-                              { label: 'Text Secondary', key: 'textSecondary' },
-                              { label: 'Border Color', key: 'borderColor' },
-                              { label: 'Accent Color', key: 'accentColor' },
-                              { label: 'Sidebar BG', key: 'sidebarBg' },
-                              { label: 'Chat BG', key: 'chatBg' },
-                              { label: 'Header BG', key: 'headerBg' },
-                              { label: 'Input BG', key: 'inputBg' },
-                              { label: 'Input Border', key: 'inputBorder' },
-                              { label: 'User Msg BG', key: 'userMsgBg' },
-                              { label: 'User Msg Border', key: 'userMsgBorder' },
-                              { label: 'Pulse Indicator', key: 'indicatorColor' },
-                              { label: 'Button BG', key: 'buttonBg' },
-                              { label: 'Button Text', key: 'buttonText' },
-                              { label: 'Settings BG', key: 'settingsBg' },
-                            ].map((item) => (
+                            {THEME_COLORS.map((item) => (
                               <div key={item.key}>
-                                <label className="block text-[10px] font-medium text-muted mb-1 uppercase tracking-wider">{item.label}</label>
+                                <label className="block text-[10px] font-medium text-muted mb-1 uppercase tracking-wider">
+                                  {item.label}
+                                </label>
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="color"
-                                    value={tempTheme.colors[item.key as keyof typeof tempTheme.colors]}
-                                    onChange={(e) => setTempTheme({
-                                      ...tempTheme,
-                                      colors: { ...tempTheme.colors, [item.key]: e.target.value }
-                                    })}
+                                    value={tempTheme.colors[item.key] || '#000000'}
+                                    onChange={(e) =>
+                                      setTempTheme({
+                                        ...tempTheme,
+                                        colors: { ...tempTheme.colors, [item.key]: e.target.value },
+                                      })
+                                    }
                                     className="w-8 h-8 bg-transparent border-0 p-0 cursor-pointer"
                                   />
                                   <input
                                     type="text"
-                                    value={tempTheme.colors[item.key as keyof typeof tempTheme.colors]}
-                                    onChange={(e) => setTempTheme({
-                                      ...tempTheme,
-                                      colors: { ...tempTheme.colors, [item.key]: e.target.value }
-                                    })}
+                                    value={tempTheme.colors[item.key] || ''}
+                                    onChange={(e) =>
+                                      setTempTheme({
+                                        ...tempTheme,
+                                        colors: { ...tempTheme.colors, [item.key]: e.target.value },
+                                      })
+                                    }
                                     className="flex-1 text-[11px] px-2 py-1 bg-white/5 border border-border rounded text-muted font-mono"
                                   />
                                 </div>
@@ -819,7 +835,7 @@ export default function Settings() {
                             onClick={saveCustomTheme}
                             className="px-6 py-2 bg-accent hover:brightness-110 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-accent/20 flex items-center gap-2"
                           >
-                            <Check className="w-4 h-4" />
+                            <Save className="w-4 h-4" />
                             Save Theme
                           </button>
                         </div>
@@ -828,17 +844,124 @@ export default function Settings() {
                   )}
                 </div>
               )}
-
+              
               <p className="mt-4 text-xs text-muted italic">
                 Changes the global look and feel of AlphaStudio.
               </p>
             </div>
           )}
 
-          {/* AI Provider Tabs (Grok, Groq, Gemini, Moonshot) */}
+          {/* Terminal Settings Tab */}
+          {activeTab === 'terminal' && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-foreground">Terminal Settings</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-muted mb-2">
+                    Font Size
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="24"
+                    value={localTerminalSettings.fontSize}
+                    onChange={(e) => setLocalTerminalSettings({...localTerminalSettings, fontSize: parseInt(e.target.value)})}
+                    className="w-full px-4 py-2.5 bg-white/5 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-muted mb-2">
+                    Cursor Style
+                  </label>
+                  <Dropdown
+                    value={localTerminalSettings.cursorStyle}
+                    onChange={(val) => setLocalTerminalSettings({...localTerminalSettings, cursorStyle: val as any})}
+                    options={[
+                      { label: 'Block', value: 'block' },
+                      { label: 'Underline', value: 'underline' },
+                      { label: 'Bar', value: 'bar' }
+                    ]}
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
+                    Font Family
+                  </label>
+                  <div className="space-y-2">
+                    <Dropdown
+                      value={isCustomFont ? 'custom' : localTerminalSettings.fontFamily}
+                      onChange={(val) => {
+                        if (val === 'custom') {
+                          setIsCustomFont(true);
+                        } else {
+                          setIsCustomFont(false);
+                          setLocalTerminalSettings({...localTerminalSettings, fontFamily: val});
+                        }
+                      }}
+                      options={[
+                        ...POPULAR_FONTS,
+                        { label: 'Custom...', value: 'custom' }
+                      ]}
+                      placeholder="Select a font..."
+                    />
+                    
+                    {isCustomFont && (
+                      <input
+                        type="text"
+                        value={localTerminalSettings.fontFamily}
+                        onChange={(e) => setLocalTerminalSettings({...localTerminalSettings, fontFamily: e.target.value})}
+                        placeholder="Enter font family string (e.g. 'Fira Code', monospace)"
+                        className="w-full px-4 py-2.5 bg-white/5 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 font-mono text-xs"
+                      />
+                    )}
+                  </div>
+                </div>
+                
+                <div className="md:col-span-2 space-y-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={localTerminalSettings.cursorBlink}
+                      onChange={(e) => setLocalTerminalSettings({...localTerminalSettings, cursorBlink: e.target.checked})}
+                      className="w-4 h-4 rounded border-border bg-white/5 text-accent focus:ring-accent/50"
+                    />
+                    Cursor Blink
+                  </label>
+                  
+                  <label className="flex items-center gap-2 text-sm font-medium text-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={localTerminalSettings.showAscii}
+                      onChange={(e) => setLocalTerminalSettings({...localTerminalSettings, showAscii: e.target.checked})}
+                      className="w-4 h-4 rounded border-border bg-white/5 text-accent focus:ring-accent/50"
+                    />
+                    Show ASCII Art Greeting (Requires Session Restart)
+                  </label>
+                </div>
+                
+                {localTerminalSettings.showAscii && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-muted mb-2">
+                      Custom ASCII Art
+                    </label>
+                    <textarea
+                      value={localTerminalSettings.customAscii}
+                      onChange={(e) => setLocalTerminalSettings({...localTerminalSettings, customAscii: e.target.value})}
+                      rows={5}
+                      className="w-full px-4 py-2.5 bg-white/5 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 font-mono text-xs whitespace-pre"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* AI Providers (Grok, Groq, Gemini, Moonshot) */}
           {(activeTab === 'grok' || activeTab === 'groq' || activeTab === 'gemini' || activeTab === 'moonshot') && (
             <div className="space-y-8">
-              {/* Provider Description */}
               <div className="p-4 bg-white/5 border border-border rounded-lg">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-white/10">
@@ -853,16 +976,15 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* API Key */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-muted">
                     <Key className="w-4 h-4 text-accent" />
                     {getProviderName()} API Key
                   </label>
-                  <a 
-                    href={getApiKeyUrl()} 
-                    target="_blank" 
+                  <a
+                    href={getApiKeyUrl()}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-[11px] text-accent hover:underline flex items-center gap-1 font-medium"
                   >
@@ -888,29 +1010,18 @@ export default function Settings() {
                 </p>
               </div>
 
-              {/* Model Selection */}
               <div>
                 <label className="block text-sm font-medium text-muted mb-2">
                   {getProviderName()} Model
                 </label>
                 <div className="relative">
-                  <select
+                  <Dropdown
                     value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full appearance-none px-4 py-3 bg-white/5 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 cursor-pointer transition-all pr-10"
-                  >
-                    {currentModels.map((model) => (
-                      <option key={model.id} value={model.id} className="bg-background">
-                        {model.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <ChevronDown className="w-4 h-4 text-muted" />
-                  </div>
+                    onChange={(val) => setSelectedModel(val)}
+                    options={currentModels.map(m => ({ label: m.name, value: m.id }))}
+                  />
                 </div>
                 
-                {/* Active Model Details Card */}
                 {currentModelInfo && (
                   <div className="mt-3 p-4 bg-white/5 border border-border rounded-lg">
                     <div className="flex justify-between items-start mb-2">
@@ -928,92 +1039,13 @@ export default function Settings() {
                   </div>
                 )}
               </div>
-
-              {/* Set as Active Provider Button */}
-              <div className="pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
-                <button
-                  onClick={() => {
-                    // Save the API key for the current provider first
-                    const currentApiKey = getApiKeyInput();
-                    if (currentApiKey) {
-                      switch (activeTab) {
-                        case 'grok':
-                          setGrokApiKey(currentApiKey);
-                          break;
-                        case 'groq':
-                          setGroqApiKey(currentApiKey);
-                          break;
-                        case 'gemini':
-                          setGeminiApiKey(currentApiKey);
-                          break;
-                        case 'moonshot':
-                          setMoonshotApiKey(currentApiKey);
-                          break;
-                      }
-                    }
-                    // Then set the provider
-                    setAIProvider(activeTab);
-                    // Also update the model if on a provider tab
-                    if (activeTab !== 'themes') {
-                      const modelBelongsToProvider = getCurrentModels().some(m => m.id === selectedModel);
-                      if (modelBelongsToProvider) {
-                        setAIBackendModel(selectedModel);
-                      } else {
-                        const fallbackModel = getCurrentModels().find(m => (m as any).recommended)?.id || getCurrentModels()[0]?.id;
-                        if (fallbackModel) {
-                          setAIBackendModel(fallbackModel);
-                        }
-                      }
-                    }
-                  }}
-                  disabled={!getApiKeyInput()}
-                  className={`w-full py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    aiProvider === activeTab
-                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                      : 'bg-white/5 text-muted hover:text-foreground hover:bg-white/10 border border-border'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {aiProvider === activeTab ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <Check className="w-4 h-4" />
-                      Currently Active
-                    </div>
-                  ) : (
-                    `Set ${getProviderName()} as Active Provider`
-                  )}
-                </button>
-                <p className="mt-2 text-[11px] text-muted text-center">
-                  {aiProvider === activeTab 
-                    ? `${getProviderName()} is your current AI provider`
-                    : `Click to switch to ${getProviderName()} for all AI interactions`
-                  }
-                </p>
-              </div>
-
-              {/* Provider-specific Info */}
-              <div className="p-4 bg-white/5 border border-border rounded-lg">
-                <div className="flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-accent shrink-0" />
-                  <div className="text-xs text-muted leading-relaxed">
-                    <p className="text-foreground font-medium mb-1">Agentic Capabilities</p>
-                    <p>
-                      AlphaStudio uses native function calling with {getProviderName()} to interact with your files and terminal. 
-                      This enables autonomous coding, project planning, and web searching.
-                      {activeTab === 'grok' && ' Grok (xAI) provides better rate limits than Groq with OpenAI-compatible API.'}
-                      {activeTab === 'groq' && ' Groq provides extremely fast inference with Llama 3.3 70B (128K context).'}
-                      {activeTab === 'gemini' && ' Gemini offers 1M+ context window for complex projects.'}
-                      {activeTab === 'moonshot' && ' Moonshot is optimized for Chinese-language understanding.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
           {/* Ollama Tab */}
           {activeTab === 'ollama' && (
             <div className="space-y-8">
-              {/* Provider Description */}
+              {/* ... (Ollama UI remains same) ... */}
               <div className="p-4 bg-white/5 border border-border rounded-lg">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-white/10">
@@ -1024,21 +1056,19 @@ export default function Settings() {
                     <p className="text-xs text-muted leading-relaxed mb-3">
                       Run models locally for privacy and offline use. No API keys required. Optimized for mid-tier to high-end hardware.
                     </p>
-                    {/* Server Status */}
+                    
                     <div className="flex items-center gap-2 mt-3">
                       {ollamaServerStatus ? (
                         ollamaServerStatus.running ? (
                           <div className="flex items-center gap-2 text-xs text-green-400">
-                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                             <span>Ollama server is running</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-xs text-red-400">
-                            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                            <div className="w-2 h-2 bg-red-400 rounded-full" />
                             <span>Ollama server not running</span>
-                            {ollamaServerStatus.error && (
-                              <span className="text-muted">({ollamaServerStatus.error})</span>
-                            )}
+                            {ollamaServerStatus.error && <span className="text-muted">({ollamaServerStatus.error})</span>}
                           </div>
                         )
                       ) : (
@@ -1047,10 +1077,7 @@ export default function Settings() {
                           <span>Checking server status...</span>
                         </div>
                       )}
-                      <button
-                        onClick={checkOllamaServer}
-                        className="ml-auto text-xs text-accent hover:underline"
-                      >
+                      <button onClick={checkOllamaServer} className="ml-auto text-xs text-accent hover:underline">
                         Refresh
                       </button>
                     </div>
@@ -1058,7 +1085,6 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Search for Models */}
               <div>
                 <label className="block text-sm font-medium text-muted mb-2">
                   <Search className="w-4 h-4 inline mr-2" />
@@ -1069,21 +1095,19 @@ export default function Settings() {
                     type="text"
                     value={ollamaSearchQuery}
                     onChange={(e) => {
-                      const query = e.target.value;
-                      setOllamaSearchQuery(query);
-                      handleSearchModels(query);
+                      const val = e.target.value;
+                      setOllamaSearchQuery(val);
+                      handleSearchModels(val);
                     }}
                     placeholder="Search for models (e.g., llama3.2:3b, mistral:7b, phi3:mini)"
                     className="flex-1 px-4 py-2.5 bg-white/5 border border-border rounded-lg text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
                   />
                 </div>
+                
                 {ollamaSearchResults.length > 0 && (
                   <div className="mt-3 space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
                     {ollamaSearchResults.map((model, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 bg-white/5 border border-border rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors"
-                      >
+                      <div key={idx} className="p-3 bg-white/5 border border-border rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors">
                         <div className="flex-1">
                           <div className="text-sm font-medium text-foreground">{model.name}</div>
                           {model.description && (
@@ -1096,21 +1120,16 @@ export default function Settings() {
                           className="px-3 py-1.5 text-xs font-medium bg-accent text-white rounded hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                           {pullingModel === model.name ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Installing...
-                            </>
+                            <><Loader2 className="w-3 h-3 animate-spin" /> Installing...</>
                           ) : (
-                            <>
-                              <Download className="w-3 h-3" />
-                              Install
-                            </>
+                            <><Download className="w-3 h-3" /> Install</>
                           )}
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
+                
                 {pullingModel && pullProgress && (
                   <div className="mt-3 p-3 bg-white/5 border border-border rounded-lg">
                     <div className="text-xs text-muted mb-1">Installing {pullingModel}...</div>
@@ -1119,19 +1138,16 @@ export default function Settings() {
                 )}
               </div>
 
-              {/* Installed Models */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <label className="text-sm font-medium text-muted">
                     Installed Models ({Array.isArray(ollamaModels) ? ollamaModels.length : 0})
                   </label>
-                  <button
-                    onClick={loadOllamaModels}
-                    className="text-xs text-accent hover:underline flex items-center gap-1"
-                  >
+                  <button onClick={loadOllamaModels} className="text-xs text-accent hover:underline flex items-center gap-1">
                     Refresh
                   </button>
                 </div>
+                
                 {!Array.isArray(ollamaModels) || ollamaModels.length === 0 ? (
                   <div className="p-6 bg-white/5 border border-border rounded-lg text-center">
                     <p className="text-sm text-muted">No models installed yet.</p>
@@ -1139,46 +1155,32 @@ export default function Settings() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {ollamaModels.map((model) => (
-                      <div
-                        key={model.id}
-                        className="p-4 bg-white/5 border border-border rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors"
-                      >
+                    {ollamaModels.map((m) => (
+                      <div key={m.id} className="p-4 bg-white/5 border border-border rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <div className="text-sm font-medium text-foreground">{model.name}</div>
-                            {model.id === selectedModel && aiProvider === 'ollama' && (
+                            <div className="text-sm font-medium text-foreground">{m.name}</div>
+                            {m.id === selectedModel && aiProvider === 'ollama' && (
                               <span className="px-2 py-0.5 text-xs bg-accent/20 text-accent rounded">Active</span>
                             )}
                           </div>
-                          {model.desc && (
-                            <div className="text-xs text-muted mt-1">{model.desc}</div>
-                          )}
-                          {model.limits && (
-                            <div className="text-xs text-muted mt-1">{model.limits}</div>
-                          )}
+                          {m.desc && <div className="text-xs text-muted mt-1">{m.desc}</div>}
+                          {m.limits && <div className="text-xs text-muted mt-1">{m.limits}</div>}
                         </div>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => {
-                              setSelectedModel(model.id);
-                              setAIBackendModel(model.id);
-                            }}
+                            onClick={() => { setSelectedModel(m.id); setAIBackendModel(m.id); }}
                             className="px-3 py-1.5 text-xs font-medium bg-white/10 text-foreground rounded hover:bg-white/20 transition-colors"
                           >
                             Select
                           </button>
                           <button
-                            onClick={() => handleDeleteModel(model.name)}
-                            disabled={deletingModel === model.name}
+                            onClick={() => handleDeleteModel(m.name)}
+                            disabled={deletingModel === m.name}
                             className="p-1.5 text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-50"
                             title="Delete model"
                           >
-                            {deletingModel === model.name ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
+                            {deletingModel === m.name ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
@@ -1186,87 +1188,61 @@ export default function Settings() {
                   </div>
                 )}
               </div>
-
-              {/* Set as Active Provider */}
-              <div className="pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
-                <button
-                  onClick={() => {
-                    setAIProvider('ollama');
-                    const models = Array.isArray(ollamaModels) ? ollamaModels : [];
-                    if (models.length > 0 && selectedModel) {
-                      const modelBelongsToProvider = models.some(m => m.id === selectedModel);
-                      if (modelBelongsToProvider) {
-                        setAIBackendModel(selectedModel);
-                      } else {
-                        const fallbackModel = models[0]?.id;
-                        if (fallbackModel) {
-                          setAIBackendModel(fallbackModel);
-                          setSelectedModel(fallbackModel);
-                        }
-                      }
-                    }
-                  }}
-                  disabled={!Array.isArray(ollamaModels) || ollamaModels.length === 0 || !ollamaServerStatus?.running}
-                  className={`w-full py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    aiProvider === 'ollama'
-                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                      : 'bg-white/5 text-muted hover:text-foreground hover:bg-white/10 border border-border'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {aiProvider === 'ollama' ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <Check className="w-4 h-4" />
-                      Currently Active
-                    </div>
-                  ) : (
-                    `Set Ollama as Active Provider`
-                  )}
-                </button>
-                <p className="mt-2 text-[11px] text-muted text-center">
-                  {aiProvider === 'ollama' 
-                    ? 'Ollama is your current AI provider'
-                    : !Array.isArray(ollamaModels) || ollamaModels.length === 0
-                    ? 'Install at least one model to use Ollama'
-                    : !ollamaServerStatus?.running
-                    ? 'Start Ollama server to use local models'
-                    : 'Click to switch to Ollama for all AI interactions'
-                  }
-                </p>
-              </div>
-
-              {/* Info */}
-              <div className="p-4 bg-white/5 border border-border rounded-lg">
-                <div className="flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-accent shrink-0" />
-                  <div className="text-xs text-muted leading-relaxed">
-                    <p className="text-foreground font-medium mb-1">Local Model Recommendations</p>
-                    <p className="mb-2">
-                      For best performance on mid-tier hardware (4 cores, 2GB VRAM):
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 mb-2">
-                      <li><strong>llama3.2:3b</strong> - Fast, efficient, good for basic tasks</li>
-                      <li><strong>llama3.2:1b</strong> - Ultra-lightweight, fastest inference</li>
-                      <li><strong>phi3:mini</strong> - Microsoft's efficient model</li>
-                      <li><strong>mistral:7b</strong> - Excellent reasoning, efficient</li>
-                    </ul>
-                    <p className="mb-2">
-                      For high-end hardware (8+ cores, 8GB+ VRAM):
-                    </p>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li><strong>llama3.1:8b</strong> - Balanced performance and quality</li>
-                      <li><strong>llama3.1:70b</strong> - High quality, requires more VRAM</li>
-                      <li><strong>qwen2.5:14b</strong> - Enhanced capabilities</li>
-                      <li><strong>deepseek-r1:14b</strong> - Strong reasoning</li>
-                    </ul>
-                    <p className="mt-3 text-foreground font-medium">
-                      Note: Models are automatically quantized for optimal performance. Install Ollama from <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ollama.com</a> if not already installed.
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>
+
+        {/* ... (Footer Action Buttons) ... */}
+        {/* Action Buttons (Activate Provider) */}
+        {(activeTab !== 'themes' && activeTab !== 'terminal') && (
+          <div className="p-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
+            <button
+              onClick={() => {
+                // Save specific API key first
+                const key = getApiKeyInput();
+                if (key) {
+                  switch (activeTab) {
+                    case 'grok': setGrokApiKey(key); break;
+                    case 'groq': setGroqApiKey(key); break;
+                    case 'gemini': setGeminiApiKey(key); break;
+                    case 'moonshot': setMoonshotApiKey(key); break;
+                  }
+                }
+                
+                setAIProvider(activeTab as any);
+                
+                // If model is selected, set it
+                if (currentModels.some(m => m.id === selectedModel)) {
+                  setAIBackendModel(selectedModel);
+                } else {
+                  // Fallback to recommended
+                  const recommended = currentModels.find(m => (m as any).recommended)?.id || currentModels[0]?.id;
+                  if (recommended) setAIBackendModel(recommended);
+                }
+              }}
+              disabled={activeTab !== 'ollama' && !getApiKeyInput()}
+              className={`w-full py-2.5 rounded-lg text-sm font-medium transition-all ${
+                aiProvider === activeTab
+                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                  : 'bg-white/5 text-muted hover:text-foreground hover:bg-white/10 border border-border'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {aiProvider === activeTab ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4" />
+                  Currently Active
+                </div>
+              ) : (
+                `Set ${getProviderName()} as Active Provider`
+              )}
+            </button>
+            <p className="mt-2 text-[11px] text-muted text-center">
+              {aiProvider === activeTab 
+                ? `${getProviderName()} is your current AI provider` 
+                : `Click to switch to ${getProviderName()} for all AI interactions`}
+            </p>
+          </div>
+        )}
 
         <div className="p-6 border-t flex justify-end gap-3 shrink-0" style={{ borderColor: 'var(--border-color)' }}>
           <button
@@ -1279,9 +1255,7 @@ export default function Settings() {
           <button
             onClick={handleSave}
             className="px-6 py-2 rounded text-sm text-white font-semibold transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-accent/20"
-            style={{
-              background: 'var(--accent-gradient)',
-            }}
+            style={{ background: 'var(--accent-gradient)' }}
           >
             <Save className="w-4 h-4 inline-block mr-2" />
             Save Changes

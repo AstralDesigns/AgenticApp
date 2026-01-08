@@ -30,6 +30,15 @@ export interface CustomTheme {
   transparency: number;
 }
 
+export interface TerminalSettings {
+  fontSize: number;
+  cursorStyle: 'block' | 'underline' | 'bar';
+  cursorBlink: boolean;
+  showAscii: boolean;
+  customAscii: string;
+  fontFamily: string;
+}
+
 export interface Task {
   id: string;
   content: string;
@@ -91,6 +100,10 @@ interface Store {
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
   
+  // Terminal Settings
+  terminalSettings: TerminalSettings;
+  setTerminalSettings: (settings: Partial<TerminalSettings>) => void;
+
   // AI Provider Settings (DeepSeek removed - using dedicated provider services)
   aiProvider: 'groq' | 'grok' | 'gemini' | 'moonshot' | 'ollama';
   setAIProvider: (provider: 'groq' | 'grok' | 'gemini' | 'moonshot' | 'ollama') => void;
@@ -246,11 +259,29 @@ export const useStore = create<Store>()((set) => ({
   // Settings
   showSettings: false,
   setShowSettings: (show) => set({ showSettings: show }),
+
+  // Terminal Settings
+  terminalSettings: {
+    fontSize: 13,
+    cursorStyle: 'block',
+    cursorBlink: true,
+    showAscii: true,
+    customAscii: `    ___    __      __            _____ __            ___      
+   /   |  / /___  / /_  ____ _  / ___// /___  ______/ (_)___ 
+  / /| | / / __ \\/ __ \\/ __ \`/  \\__ \\/ __/ / / / __  / / __ \\
+ / ___ |/ / /_/ / / / / /_/ /  ___/ / /_/ /_/ / /_/ / / /_/ /
+/_/  |_/_/ .___/_/ /_/\\__,_/  /____/\\__/\\__,_/\\__,_/_/\\____/ 
+        /_/                                                  `,
+    fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MesloLGS NF", "Cascadia Code", Consolas, monospace'
+  },
+  setTerminalSettings: (settings) => set((state) => ({
+    terminalSettings: { ...state.terminalSettings, ...settings }
+  })),
   
-  // AI Provider Settings - Default to Gemini (best for complex tasks)
+  // AI Provider Settings
   aiProvider: 'gemini',
   setAIProvider: (provider) => set((state) => {
-    let newModel = 'gemini-2.5-flash'; // Default fallback
+    let newModel = 'gemini-2.5-flash';
     
     if (provider === 'ollama') {
       newModel = state.ollamaModels.length > 0 ? state.ollamaModels[0].id : 'llama3.2';
@@ -275,41 +306,32 @@ export const useStore = create<Store>()((set) => ({
   moonshotApiKey: '',
   setMoonshotApiKey: (key) => set({ moonshotApiKey: key }),
   
-  // AI Backend Model (default to Gemini 2.5 Flash - native API, 1M context)
+  // AI Backend Model
   aiBackendModel: 'gemini-2.5-flash',
   setAIBackendModel: (model) => set({ aiBackendModel: model }),
   
-  // Available Models (combined list)
+  // Available Models
   availableModels: [
-    // Gemini models
     { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', desc: 'State-of-the-art, Pro-grade reasoning at Flash speed', limits: '5 RPM (free tier)', provider: 'gemini', recommended: false },
     { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Fast, 1M context, 65K output - RECOMMENDED', limits: '15 RPM, 1M RPD (free)', provider: 'gemini', recommended: true },
     { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Advanced reasoning, 1M context (slower)', limits: '2 RPM, 50 RPD (free)', provider: 'gemini', recommended: false },
     { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', desc: 'Most efficient, 1M context', limits: '15 RPM (free)', provider: 'gemini', recommended: false },
     
-    // Grok models (xAI - better rate limits than Groq)
     { id: 'grok-4.1-fast', name: 'Grok 4.1 Fast', desc: 'Optimized for tool-calling and agentic workflows, 2M token context', limits: 'Better rate limits than Groq, optimized for agents', provider: 'grok', recommended: true },
     { id: 'grok-4.1', name: 'Grok 4.1', desc: 'Latest Grok model with enhanced reasoning and multimodal understanding', limits: 'Better rate limits than Groq', provider: 'grok', recommended: false },
     { id: 'grok-beta', name: 'Grok Beta', desc: 'Beta model with extended context (legacy)', limits: 'Better rate limits than Groq', provider: 'grok', recommended: false },
     
-    // Groq models (Llama 3.3 70B has better rate limits)
     { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', desc: '128K context, excellent reasoning', limits: 'Fast, better rate limits', provider: 'groq', recommended: true },
     { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', desc: '128K context, very fast', limits: 'Free tier available', provider: 'groq', recommended: false },
     { id: 'moonshotai/kimi-k2-instruct', name: 'Kimi K2 Instruct', desc: '131K context, 16K output - low rate limit (10K TPM)', limits: 'Rate limited on free tier', provider: 'groq', recommended: false },
-    // Mixtral 8x7B decommissioned by Groq
     
-    // Moonshot models
     { id: 'moonshot-v1-8k', name: 'Moonshot v1 8K', desc: '8K context window, balanced performance', limits: 'Requires API key', provider: 'moonshot', recommended: false },
     { id: 'moonshot-v1-32k', name: 'Moonshot v1 32K', desc: '32K context window', limits: 'Requires API key', provider: 'moonshot', recommended: false },
     { id: 'moonshot-v1-128k', name: 'Moonshot v1 128K', desc: '128K context window - RECOMMENDED', limits: 'Requires API key', provider: 'moonshot', recommended: true },
   ],
   setAvailableModels: (models) => set({ availableModels: models }),
-  refreshModels: async () => {
-    // Models are now static for all providers
-  },
+  refreshModels: async () => {},
   
-  // Provider-specific model lists (derived from availableModels)
-  // DeepSeek temporarily disabled
   deepseekModels: [],
   grokModels: [
     { id: 'grok-4.1-fast', name: 'Grok 4.1 Fast', desc: 'Optimized for tool-calling and agentic workflows, 2M token context', limits: 'Better rate limits than Groq, optimized for agents' },
@@ -317,9 +339,7 @@ export const useStore = create<Store>()((set) => ({
     { id: 'grok-beta', name: 'Grok Beta', desc: 'Beta model with extended context (legacy)', limits: 'Better rate limits than Groq' },
   ],
   ollamaModels: [],
-  refreshOllamaModels: async () => {
-    // This will be called from the Settings component via IPC
-  },
+  refreshOllamaModels: async () => {},
   groqModels: [
     { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', desc: '128K context, excellent reasoning', limits: 'Fast, better rate limits' },
     { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', desc: '128K context, very fast', limits: 'Free tier available' },
@@ -431,7 +451,7 @@ export const useStore = create<Store>()((set) => ({
     };
   }),
   
-  // Pending Diffs (for batch approval)
+  // Pending Diffs
   pendingDiffs: new Map(),
   diffHistory: new Map(),
   acceptedDiffs: new Set(),
@@ -453,7 +473,6 @@ export const useStore = create<Store>()((set) => ({
     const diff = state.pendingDiffs.get(filePath) || state.diffHistory.get(filePath);
     if (!diff) return;
     
-    // Write file via IPC
     if (window.electronAPI?.approveDiff) {
       await window.electronAPI.approveDiff(filePath, diff.modified);
     }
@@ -466,12 +485,10 @@ export const useStore = create<Store>()((set) => ({
       const newDiffs = new Map(state.pendingDiffs);
       newDiffs.delete(filePath);
       
-      // Refresh pane content if the file is open
       const updatedPanes = state.panes.map(p => 
         p.id === filePath ? { ...p, content: diff.modified, isUnsaved: false } : p
       );
       
-      // Update context files if the file is in context
       const updatedContextFiles = state.contextFiles.map(f =>
         f.path === filePath ? { ...f, content: diff.modified } : f
       );
@@ -486,7 +503,6 @@ export const useStore = create<Store>()((set) => ({
     });
   },
   rejectDiff: async (filePath) => {
-    // Notify agent via IPC
     if (window.electronAPI?.rejectDiff) {
       await window.electronAPI.rejectDiff(filePath);
     }
@@ -852,7 +868,6 @@ if (typeof window !== 'undefined') {
     try {
       const parsed = JSON.parse(stored);
       
-      // Migrate old model names to new models
       const validGeminiModels = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
       const validGrokModels = ['grok-4.1-fast', 'grok-4.1', 'grok-beta'];
       const validGroqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'moonshotai/kimi-k2-instruct'];
@@ -861,13 +876,11 @@ if (typeof window !== 'undefined') {
       let model = parsed.aiBackendModel || 'gemini-2.5-flash';
       let provider = parsed.aiProvider || 'gemini';
       
-      // DeepSeek is removed - migrate to Gemini
       if (provider === 'deepseek') {
         provider = 'gemini';
         model = 'gemini-2.5-flash';
       }
       
-      // Map old/decommissioned model names to new provider/models
       const oldModelMap: Record<string, { provider: string, model: string }> = {
         'llama3.1': { provider: 'groq', model: 'llama-3.3-70b-versatile' },
         'llama3.1:8b': { provider: 'groq', model: 'llama-3.3-70b-versatile' },
@@ -878,8 +891,8 @@ if (typeof window !== 'undefined') {
         'deepseek-chat': { provider: 'gemini', model: 'gemini-2.5-flash' },
         'deepseek-coder': { provider: 'gemini', model: 'gemini-2.5-flash' },
         'deepseek-reasoner': { provider: 'gemini', model: 'gemini-2.5-flash' },
-        'mixtral-8x7b-32768': { provider: 'groq', model: 'llama-3.3-70b-versatile' }, // Decommissioned
-        'llama-3.2-90b-vision-preview': { provider: 'groq', model: 'llama-3.3-70b-versatile' }, // Removed
+        'mixtral-8x7b-32768': { provider: 'groq', model: 'llama-3.3-70b-versatile' },
+        'llama-3.2-90b-vision-preview': { provider: 'groq', model: 'llama-3.3-70b-versatile' },
         'gemini-2.5-flash': { provider: 'gemini', model: 'gemini-2.5-flash' },
       };
       
@@ -888,7 +901,6 @@ if (typeof window !== 'undefined') {
         model = oldModelMap[model].model;
       }
       else {
-        // Validate model belongs to provider
         if (provider === 'gemini' && !validGeminiModels.includes(model)) {
           model = 'gemini-2.5-flash';
         } else if (provider === 'grok' && !validGrokModels.includes(model)) {
@@ -905,8 +917,6 @@ if (typeof window !== 'undefined') {
         customThemes: parsed.customThemes || [],
         activeCustomThemeId: parsed.activeCustomThemeId || null,
         activeStandardThemeId: parsed.activeStandardThemeId || null,
-        
-        // AI Provider settings (deepseek migrated to gemini)
         aiProvider: provider as 'groq' | 'grok' | 'gemini' | 'moonshot' | 'ollama',
         ollamaModels: parsed.ollamaModels || [],
         geminiApiKey: parsed.geminiApiKey || '',
@@ -915,15 +925,25 @@ if (typeof window !== 'undefined') {
         grokApiKey: parsed.grokApiKey || '',
         moonshotApiKey: parsed.moonshotApiKey || '',
         aiBackendModel: model,
-        
-        // Legacy data
+        terminalSettings: parsed.terminalSettings || {
+          fontSize: 13,
+          cursorStyle: 'block',
+          cursorBlink: true,
+          showAscii: true,
+          customAscii: `    ___    __      __            _____ __            ___      
+   /   |  / /___  / /_  ____ _  / ___// /___  ______/ (_)___ 
+  / /| | / / __ \\/ __ \\/ __ \`/  \\__ \\/ __/ / / / __  / / __ \\
+ / ___ |/ / /_/ / / / / /_/ /  ___/ / /_/ /_/ / /_/ / / /_/ /
+/_/  |_/_/ .___/_/ /_/\\__,_/  /____/\\__/\\__,_/\\__,_/_/\\____/ 
+        /_/                                                  `,
+          fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MesloLGS NF", "Cascadia Code", Consolas, monospace'
+        },
         tasks: parsed.tasks || [],
         messages: parsed.messages || [],
         sidebarWidth: parsed.sidebarWidth || 256,
         chatWidth: parsed.chatWidth || 384,
       });
     } catch (e) {
-      // Ignore parse errors
       console.error('Failed to parse stored state:', e);
     }
   }
@@ -935,8 +955,6 @@ if (typeof window !== 'undefined') {
         customThemes: state.customThemes,
         activeCustomThemeId: state.activeCustomThemeId,
         activeStandardThemeId: state.activeStandardThemeId,
-        
-        // AI Provider settings
         aiProvider: state.aiProvider,
         geminiApiKey: state.geminiApiKey,
         deepseekApiKey: state.deepseekApiKey,
@@ -945,8 +963,7 @@ if (typeof window !== 'undefined') {
         moonshotApiKey: state.moonshotApiKey,
         ollamaModels: state.ollamaModels,
         aiBackendModel: state.aiBackendModel,
-        
-        // Legacy data
+        terminalSettings: state.terminalSettings,
         tasks: state.tasks,
         messages: state.messages.map(msg => ({
           id: msg.id,
