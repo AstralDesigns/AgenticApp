@@ -42,10 +42,10 @@ A futuristic AI-powered code editor and workspace with native local and non-loca
 
 ### Left sidebar
 
-#### File explorer (Navigate through all your system files -  Changes to root files won't be saved)
+#### Project tree (Navigate through an open project and easily find files set deeper in the project tree)
 <img width="1366" height="768" alt="screenshot_10012026_225110" src="https://github.com/user-attachments/assets/5b0fa875-ef1d-4106-80a3-531d52c5c0d8" />
 
-#### Project tree (Navigate through an open project and easily find files set deeper in the project tree)
+#### File explorer (Navigate through all your system files -  Changes to root files won't be saved)
 <img width="1366" height="768" alt="screenshot_10012026_225044" src="https://github.com/user-attachments/assets/758d862b-be9c-4707-8dc2-0eedb11c41a3" />
 
 ### Right sidebar
