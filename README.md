@@ -1,16 +1,16 @@
 # AlphaStudio
 
-A futuristic AI-powered code editor and workspace with Gemini integration, built with Electron, React, and TypeScript.
+A futuristic AI-powered code editor and workspace with native local and non-local AI integration, built with Electron, React, and TypeScript.
 
 ## Features
 
-- **Monaco Editor** with autocompletion and CursorAI-style widgets
+- **Monaco Editor** with autocompletion and modern style widgets
 - **Multi-Provider AI Integration** via native Electron IPC:
+  - **Ollama** (Native local LLM installation and support for privacy and offline use) 
   - **Google Gemini** (Native API)
   - **xAI Grok** (OpenAI-compatible)
   - **Groq** (OpenAI-compatible, Llama 3)
   - **Moonshot AI** (Kimi, OpenAI-compatible)
-  - **Ollama** (Local LLM support for privacy and offline use)
 - **Chat Panel** with streaming responses, context attachment, and tool execution
 - **Task Management** with AI-powered task analysis and dynamic planning
 - **Diff Widget** for reviewing generated code changes
@@ -19,6 +19,49 @@ A futuristic AI-powered code editor and workspace with Gemini integration, built
 - **Image & File Context** attachment with preview
 - **Multiple Themes**: Light, Dark, Aether gradient, and custom theming support
 - **Cross-platform**: Linux, macOS, and Windows
+
+## Showcase
+
+### Canvases
+
+#### Editor
+<img width="1366" height="768" alt="screenshot_10012026_223315" src="https://github.com/user-attachments/assets/f022ebde-23b7-48e3-ac2c-a86434dcd0ed" />
+
+#### Media Gallery (Images can be added to context for models that support image context while videos are simply viewed)
+
+1. Image Gallery
+<img width="1366" height="768" alt="screenshot_10012026_225718" src="https://github.com/user-attachments/assets/8f1ded35-aa70-421d-a1ff-bd1512814000" />
+<img width="1366" height="768" alt="screenshot_10012026_225733" src="https://github.com/user-attachments/assets/4adc6060-2618-4291-b54c-4f68d9e5e67f" />
+
+2. Video Gallery
+<img width="1366" height="768" alt="screenshot_10012026_225541" src="https://github.com/user-attachments/assets/d31325e3-c292-406b-a260-31ffc43d7cff" />
+<img width="1366" height="768" alt="screenshot_10012026_225632" src="https://github.com/user-attachments/assets/1da9efe6-2dd5-4c84-826c-19b4c94dbfd6" />
+
+#### PDF handling
+<img width="1366" height="768" alt="screenshot_10012026_225807" src="https://github.com/user-attachments/assets/527bcbf9-b8ba-406a-9391-75cfd0a2675c" />
+
+### Left sidebar
+
+#### File explorer (Navigate through all your system files -  Changes to root files won't be saved)
+<img width="1366" height="768" alt="screenshot_10012026_225110" src="https://github.com/user-attachments/assets/5b0fa875-ef1d-4106-80a3-531d52c5c0d8" />
+
+#### Project tree (Navigate through an open project and easily find files set deeper in the project tree)
+<img width="1366" height="768" alt="screenshot_10012026_225044" src="https://github.com/user-attachments/assets/758d862b-be9c-4707-8dc2-0eedb11c41a3" />
+
+### Right sidebar
+
+#### Chat interface (Modern interface to interact with your selected agent model)
+<img width="1366" height="768" alt="screenshot_10012026_225832" src="https://github.com/user-attachments/assets/dbb6bb42-7f5e-4296-92c9-9cfebcd84a21" />
+
+#### Terminal (User centric terminal for code execution directly from the app)
+<img width="1366" height="768" alt="screenshot_10012026_225842" src="https://github.com/user-attachments/assets/1018a595-3ca2-473b-93bd-7ee8047900bb" />
+
+### Settings
+
+#### Handle app license key setup, user theme settings, AI API key setup, Pulling local Ollama models directly from the app
+<img width="1366" height="768" alt="screenshot_10012026_230016" src="https://github.com/user-attachments/assets/a4683f27-b6f1-40e9-92f4-cbdf9d70ad21" />
+<img width="1366" height="768" alt="screenshot_10012026_230016" src="https://github.com/user-attachments/assets/4a6a1439-d9fa-4284-a67c-8c21531c9b41" />
+<img width="1366" height="768" alt="screenshot_10012026_230016" src="https://github.com/user-attachments/assets/2f2a5862-972c-4bc7-a108-8654540740c7" />
 
 ## Setup
 
@@ -44,30 +87,11 @@ npm install
    - Select your preferred AI provider
    - Enter your API key (or configure Ollama for local models)
 
-### Development
-
-Run in development mode:
-```bash
-npm run dev
-```
-
-This will start:
-- Vite dev server on http://localhost:5173
-- Electron app
-
 ### Building
 
 Build for production:
 ```bash
 npm run build
-```
-
-Package for distribution:
-```bash
-npm run package        # All platforms
-npm run package:linux # Linux only
-npm run package:mac   # macOS only
-npm run package:win   # Windows only
 ```
 
 ## Usage
@@ -103,7 +127,3 @@ alpha-studio/
 - **File Operations**: Node.js fs module (native)
 - **State**: Zustand
 - **UI**: Lucide React icons, Framer Motion
-
-## License
-
-MIT
