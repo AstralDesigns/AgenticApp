@@ -265,7 +265,7 @@ export const useStore = create<Store>()((set) => ({
 
   // Terminal Settings
   terminalSettings: {
-    fontSize: 13,
+    fontSize: 10,
     cursorStyle: 'block',
     cursorBlink: true,
     fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MesloLGS NF", "Cascadia Code", Consolas, monospace',
