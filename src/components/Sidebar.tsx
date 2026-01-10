@@ -22,6 +22,7 @@ import {
   ExternalLink,
   Type,
   Search,
+  ArrowRight,
 } from 'lucide-react';
 import { useStore } from '../store';
 import { useFileSystem, FileSystemItem } from '../services/file-system.service';
@@ -71,6 +72,9 @@ export default function Sidebar() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Helper to normalize paths for comparison
+  const normalizePath = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '');
+
   // Handle project search
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -84,7 +88,6 @@ export default function Sidebar() {
     }
 
     setIsSearchingProject(true);
-    const requestId = Date.now(); // Simple ID to track this specific search request
     
     searchTimeoutRef.current = setTimeout(async () => {
       if (window.electronAPI?.findFiles) {
@@ -110,7 +113,9 @@ export default function Sidebar() {
 
   // Load children for a folder (on-demand)
   const loadFolderChildren = useCallback(async (folderPath: string, force = false) => {
-    if (!force && (folderChildrenRef.current.has(folderPath) || loadingFoldersRef.current.has(folderPath))) {
+    const normalizedPath = normalizePath(folderPath);
+    
+    if (!force && (folderChildrenRef.current.has(normalizedPath) || loadingFoldersRef.current.has(normalizedPath))) {
       return; // Already loaded or loading
     }
 
@@ -118,35 +123,35 @@ export default function Sidebar() {
       return;
     }
 
-    setLoadingFolders((prev) => new Set(prev).add(folderPath));
+    setLoadingFolders((prev) => new Set(prev).add(normalizedPath));
 
     try {
-      let resolvedPath = folderPath;
-      if (folderPath === '~' || folderPath.startsWith('~/')) {
+      let resolvedPath = normalizedPath;
+      if (normalizedPath === '~' || normalizedPath.startsWith('~/')) {
         if (window.electronAPI.getSystemInfo) {
           const info = await window.electronAPI.getSystemInfo();
-          resolvedPath = folderPath.replace(/^~/, info.homeDir || '~');
+          resolvedPath = normalizedPath.replace(/^~/, info.homeDir || '~');
         }
       }
 
       const result = await window.electronAPI.readDirectory(resolvedPath);
       if ('error' in result) {
-        console.error(`Error loading folder ${folderPath}:`, result.error);
-        setFolderChildren((prev) => new Map(prev).set(folderPath, []));
+        console.error(`Error loading folder ${normalizedPath}:`, result.error);
+        setFolderChildren((prev) => new Map(prev).set(normalizedPath, []));
       } else {
         // Filter dotfiles based on showDotfiles setting
         const filtered = showDotfiles
           ? result
           : result.filter((item: FileSystemItem) => !item.name.startsWith('.'));
-        setFolderChildren((prev) => new Map(prev).set(folderPath, filtered));
+        setFolderChildren((prev) => new Map(prev).set(normalizedPath, filtered));
       }
     } catch (error) {
-      console.error(`Error loading folder ${folderPath}:`, error);
-      setFolderChildren((prev) => new Map(prev).set(folderPath, []));
+      console.error(`Error loading folder ${normalizedPath}:`, error);
+      setFolderChildren((prev) => new Map(prev).set(normalizedPath, []));
     } finally {
       setLoadingFolders((prev) => {
         const next = new Set(prev);
-        next.delete(folderPath);
+        next.delete(normalizedPath);
         return next;
       });
     }
@@ -159,7 +164,7 @@ export default function Sidebar() {
 
   // Load root folder children when project is opened and root is expanded
   useEffect(() => {
-    if (projectRoot && expandedFolders.has(projectRoot) && !folderChildren.has(projectRoot) && !loadingFolders.has(projectRoot)) {
+    if (projectRoot && expandedFolders.has(projectRoot)) {
       loadFolderChildren(projectRoot);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,19 +172,22 @@ export default function Sidebar() {
 
   // Helper function to invalidate and refresh folders containing changed files
   const invalidateFoldersForFiles = useCallback((filePaths: string[]) => {
-    if (mode !== 'project' || !projectRoot) return;
-
+    if (!projectRoot) return;
+    
+    const normalizedRoot = normalizePath(projectRoot);
     const foldersToInvalidate = new Set<string>();
     
     filePaths.forEach((filePath) => {
+      const normalizedFilePath = normalizePath(filePath);
+      
       // Only process if file is within project root
-      if (filePath.startsWith(projectRoot)) {
-        const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
-        if (parentDir && parentDir !== projectRoot) {
+      if (normalizedFilePath.startsWith(normalizedRoot)) {
+        const parentDir = normalizedFilePath.substring(0, normalizedFilePath.lastIndexOf('/'));
+        if (parentDir && parentDir.length >= normalizedRoot.length) {
           foldersToInvalidate.add(parentDir);
         }
         // Always invalidate project root if any file changes
-        foldersToInvalidate.add(projectRoot);
+        foldersToInvalidate.add(normalizedRoot);
       }
     });
 
@@ -192,31 +200,31 @@ export default function Sidebar() {
       return newMap;
     });
 
-    // Reload if folder is currently expanded
+    // Reload if folder is currently expanded or is root
     foldersToInvalidate.forEach((folderPath) => {
-      if (expandedFolders.has(folderPath)) {
+      if (folderPath === normalizedRoot || expandedFolders.has(folderPath)) {
         loadFolderChildren(folderPath, true); // Force reload
       }
     });
-  }, [mode, projectRoot, expandedFolders, loadFolderChildren]);
+  }, [projectRoot, expandedFolders, loadFolderChildren]);
 
   // Refresh project tree when pending diffs change (files written by agent)
   useEffect(() => {
-    if (mode === 'project' && projectRoot && pendingDiffs.size > 0) {
+    if (projectRoot && pendingDiffs.size > 0) {
       const changedFiles = Array.from(pendingDiffs.keys());
       invalidateFoldersForFiles(changedFiles);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingDiffs.size, mode, projectRoot, invalidateFoldersForFiles]);
+  }, [pendingDiffs.size, projectRoot, invalidateFoldersForFiles]);
 
   // Refresh project tree when files are accepted (written to disk)
   useEffect(() => {
-    if (mode === 'project' && projectRoot && acceptedDiffs.size > 0) {
+    if (projectRoot && acceptedDiffs.size > 0) {
       const changedFiles = Array.from(acceptedDiffs);
       invalidateFoldersForFiles(changedFiles);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acceptedDiffs.size, mode, projectRoot, invalidateFoldersForFiles]);
+  }, [acceptedDiffs.size, projectRoot, invalidateFoldersForFiles]);
 
   // Filter content based on search
   const filteredContent = useMemo(() => {
@@ -251,22 +259,24 @@ export default function Sidebar() {
   const openProject = useCallback(async (projectPath: string) => {
     const { setProjectContext, setIsBuildingContext } = useStore.getState();
     if (!window.electronAPI) return;
+    
+    const normalizedPath = normalizePath(projectPath);
 
-    setProjectRoot(projectPath);
+    setProjectRoot(normalizedPath);
     setMode('project');
-    setExpandedFolders(new Set([projectPath])); // Auto-expand root
+    setExpandedFolders(new Set([normalizedPath])); // Auto-expand root
     
     // Build project context
     setIsBuildingContext(true);
-    setProjectContext(projectPath);
+    setProjectContext(normalizedPath);
     
     setIsBuildingContext(false);
     
     // Load root folder contents immediately
-    await loadFolderChildren(projectPath);
+    await loadFolderChildren(normalizedPath, true);
 
     // Notify main process to save this as the last opened project
-    window.electronAPI.project.setCurrent(projectPath);
+    window.electronAPI.project.setCurrent(normalizedPath);
   }, [loadFolderChildren]);
 
   const handleOpenProject = async () => {
@@ -301,169 +311,61 @@ export default function Sidebar() {
     }
   }, [openProject]);
 
-  // Listen for file system events (created, deleted, renamed, modified)
-  // Use refs to store stable handler references to prevent memory leaks
-  const debounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const processedEventsRef = useRef<Set<string>>(new Set());
-  
-  // Create stable handler functions using useCallback to prevent memory leaks
-  const handleFileCreated = useCallback((_: any, data: { path: string; resolvedPath: string }) => {
-    const DEBOUNCE_DELAY = 200; // ms
-    const eventKey = `created:${data.path}`;
+  // Handle generic file system events
+  const handleFileSystemEvent = useCallback((type: 'created' | 'deleted' | 'renamed', data: any) => {
+    let pathsToInvalidate: string[] = [];
     
-    // Skip if already processed
-    if (processedEventsRef.current.has(eventKey)) return;
+    if (type === 'renamed') {
+      pathsToInvalidate = [data.oldPath, data.newPath];
+    } else {
+      pathsToInvalidate = [data.path];
+    }
     
-    // Clear existing timer
-    const existingTimer = debounceTimersRef.current.get(eventKey);
-    if (existingTimer) clearTimeout(existingTimer);
-    
-    // Set new timer
-    const timer = setTimeout(() => {
-      processedEventsRef.current.add(eventKey);
-      console.log('[Sidebar] File created:', data.path, 'resolved:', data.resolvedPath);
-      
-      if (mode === 'project' && projectRoot) {
-        // Handle both relative and absolute paths
-        let fullPath = data.path;
-        if (!fullPath.startsWith(projectRoot) && !fullPath.startsWith('/') && !fullPath.startsWith('~')) {
-          // Relative path from project root
-          fullPath = `${projectRoot}/${data.path}`.replace(/\/+/g, '/');
-        } else if (fullPath.startsWith('~')) {
-          // Resolve ~ to project root if it's a relative path
-          fullPath = fullPath.replace(/^~/, projectRoot);
+    // Resolve absolute paths if they are relative
+    if (projectRoot) {
+      pathsToInvalidate = pathsToInvalidate.map(p => {
+        let normalized = normalizePath(p);
+        if (!normalized.startsWith('/') && !normalized.startsWith('~') && !normalized.includes(':')) {
+           // Relative path
+           return `${projectRoot}/${normalized}`;
         }
-        invalidateFoldersForFiles([fullPath]);
-        const parentPath = fullPath.split('/').slice(0, -1).join('/') || projectRoot;
-        // Always refresh if it's the root or if the parent is expanded
-        if (parentPath === projectRoot || expandedFolders.has(parentPath)) {
-          loadFolderChildren(parentPath);
-        }
-      } else if (mode === 'files') {
-        refreshDirectory();
-      }
-      
-      // Clean up after delay
-      setTimeout(() => processedEventsRef.current.delete(eventKey), 1000);
-      debounceTimersRef.current.delete(eventKey);
-    }, DEBOUNCE_DELAY);
+        return normalized;
+      });
+    }
+
+    console.log(`[Sidebar] File ${type}:`, pathsToInvalidate);
     
-    debounceTimersRef.current.set(eventKey, timer);
-  }, [mode, projectRoot, expandedFolders, loadFolderChildren, refreshDirectory, invalidateFoldersForFiles]);
-  
-  const handleFileDeleted = useCallback((_: any, data: { path: string; resolvedPath: string }) => {
-    const DEBOUNCE_DELAY = 200; // ms
-    const eventKey = `deleted:${data.path}`;
+    // Update Project View - update tree even if not in project mode
+    if (projectRoot) {
+      invalidateFoldersForFiles(pathsToInvalidate);
+    }
     
-    // Skip if already processed
-    if (processedEventsRef.current.has(eventKey)) return;
-    
-    // Clear existing timer
-    const existingTimer = debounceTimersRef.current.get(eventKey);
-    if (existingTimer) clearTimeout(existingTimer);
-    
-    // Set new timer
-    const timer = setTimeout(() => {
-      processedEventsRef.current.add(eventKey);
-      console.log('[Sidebar] File deleted:', data.path, 'resolved:', data.resolvedPath);
-      
-      if (mode === 'project' && projectRoot) {
-        // Handle both relative and absolute paths
-        let fullPath = data.path;
-        if (!fullPath.startsWith(projectRoot) && !fullPath.startsWith('/') && !fullPath.startsWith('~')) {
-          // Relative path from project root
-          fullPath = `${projectRoot}/${data.path}`.replace(/\/+/g, '/');
-        } else if (fullPath.startsWith('~')) {
-          // Resolve ~ to project root if it's a relative path
-          fullPath = fullPath.replace(/^~/, projectRoot);
-        }
-        invalidateFoldersForFiles([fullPath]);
-        const parentPath = fullPath.split('/').slice(0, -1).join('/') || projectRoot;
-        // Always refresh parent folder - deleted files should always trigger refresh
-        console.log('[Sidebar] Refreshing parent folder after delete:', parentPath);
-        loadFolderChildren(parentPath);
-      } else if (mode === 'files') {
-        refreshDirectory();
-      }
-      
-      // Clean up after delay
-      setTimeout(() => processedEventsRef.current.delete(eventKey), 1000);
-      debounceTimersRef.current.delete(eventKey);
-    }, DEBOUNCE_DELAY);
-    
-    debounceTimersRef.current.set(eventKey, timer);
-  }, [mode, projectRoot, expandedFolders, loadFolderChildren, refreshDirectory, invalidateFoldersForFiles]);
-  
-  const handleFileRenamed = useCallback((_: any, data: { oldPath: string; newPath: string; oldResolvedPath: string; newResolvedPath: string }) => {
-    const DEBOUNCE_DELAY = 200; // ms
-    const eventKey = `renamed:${data.oldPath}:${data.newPath}`;
-    
-    // Skip if already processed
-    if (processedEventsRef.current.has(eventKey)) return;
-    
-    // Clear existing timer
-    const existingTimer = debounceTimersRef.current.get(eventKey);
-    if (existingTimer) clearTimeout(existingTimer);
-    
-    // Set new timer
-    const timer = setTimeout(() => {
-      processedEventsRef.current.add(eventKey);
-      console.log('[Sidebar] File renamed:', data.oldPath, '->', data.newPath);
-      
-      if (mode === 'project' && projectRoot) {
-        // Handle both relative and absolute paths
-        let oldFullPath = data.oldPath;
-        let newFullPath = data.newPath;
-        
-        if (!oldFullPath.startsWith(projectRoot) && !oldFullPath.startsWith('/') && !oldFullPath.startsWith('~')) {
-          oldFullPath = `${projectRoot}/${data.oldPath}`.replace(/\/+/g, '/');
-        } else if (oldFullPath.startsWith('~')) {
-          oldFullPath = oldFullPath.replace(/^~/, projectRoot);
-        }
-        
-        if (!newFullPath.startsWith(projectRoot) && !newFullPath.startsWith('/') && !newFullPath.startsWith('~')) {
-          newFullPath = `${projectRoot}/${data.newPath}`.replace(/\/+/g, '/');
-        } else if (newFullPath.startsWith('~')) {
-          newFullPath = newFullPath.replace(/^~/, projectRoot);
-        }
-        
-        invalidateFoldersForFiles([oldFullPath, newFullPath]);
-        const parentPath = newFullPath.split('/').slice(0, -1).join('/') || projectRoot;
-        // Always refresh if it's the root or if the parent is expanded
-        if (parentPath === projectRoot || expandedFolders.has(parentPath)) {
-          loadFolderChildren(parentPath);
-        }
-      } else if (mode === 'files') {
-        refreshDirectory();
-      }
-      
-      // Clean up after delay
-      setTimeout(() => processedEventsRef.current.delete(eventKey), 1000);
-      debounceTimersRef.current.delete(eventKey);
-    }, DEBOUNCE_DELAY);
-    
-    debounceTimersRef.current.set(eventKey, timer);
-  }, [mode, projectRoot, expandedFolders, loadFolderChildren, refreshDirectory, invalidateFoldersForFiles]);
-  
+    // Update Files View - always refresh
+    refreshDirectory();
+  }, [projectRoot, invalidateFoldersForFiles, refreshDirectory]);
+
+  // Hook up event listeners with proper cleanup
+  // We use a ref to store the stable handler to avoid re-binding unnecessarily
+  const handleFileSystemEventRef = useRef(handleFileSystemEvent);
+  handleFileSystemEventRef.current = handleFileSystemEvent;
+
   useEffect(() => {
     if (!window.electronAPI?.on) return;
     
-    window.electronAPI.on('file-system:created', handleFileCreated);
-    window.electronAPI.on('file-system:deleted', handleFileDeleted);
-    window.electronAPI.on('file-system:renamed', handleFileRenamed);
+    const onCreated = (_: any, data: any) => handleFileSystemEventRef.current('created', data);
+    const onDeleted = (_: any, data: any) => handleFileSystemEventRef.current('deleted', data);
+    const onRenamed = (_: any, data: any) => handleFileSystemEventRef.current('renamed', data);
+    
+    window.electronAPI.on('file-system:created', onCreated);
+    window.electronAPI.on('file-system:deleted', onDeleted);
+    window.electronAPI.on('file-system:renamed', onRenamed);
     
     return () => {
-      // Clear all debounce timers
-      debounceTimersRef.current.forEach(timer => clearTimeout(timer));
-      debounceTimersRef.current.clear();
-      processedEventsRef.current.clear();
-      
-      // Remove listeners using stable callback references
-      window.electronAPI.off('file-system:created', handleFileCreated);
-      window.electronAPI.off('file-system:deleted', handleFileDeleted);
-      window.electronAPI.off('file-system:renamed', handleFileRenamed);
+      window.electronAPI.off('file-system:created', onCreated);
+      window.electronAPI.off('file-system:deleted', onDeleted);
+      window.electronAPI.off('file-system:renamed', onRenamed);
     };
-  }, [handleFileCreated, handleFileDeleted, handleFileRenamed]);
+  }, []); // Empty dependency array as we use ref
 
   // Handle rename with useCallback to fix React hook error
   const handleRename = useCallback(async () => {
@@ -475,16 +377,17 @@ export default function Sidebar() {
       const result = await window.electronAPI.renameFile(renameDialog.item.path, renameDialog.newName.trim());
       if (result.success) {
         setRenameDialog({ item: null, newName: '' });
-        // Refresh the directory
-        if (mode === 'files') {
-          refreshDirectory();
-        } else {
-          // Invalidate folder cache and reload
-          const parentPath = renameDialog.item.path.split('/').slice(0, -1).join('/') || projectRoot || '~';
-          invalidateFoldersForFiles([renameDialog.item.path]);
-          if (expandedFolders.has(parentPath) || parentPath === projectRoot) {
-            await loadFolderChildren(parentPath === projectRoot ? projectRoot : parentPath, true);
-          }
+        
+        // Always refresh Files view
+        refreshDirectory();
+        
+        // For project mode, manual invalidation helps perceived speed
+        // Update it regardless of current mode, so it's ready when switching
+        if (projectRoot) {
+           const oldPath = renameDialog.item.path;
+           const parentDir = oldPath.split('/').slice(0, -1).join('/');
+           const newPath = parentDir ? `${parentDir}/${renameDialog.newName.trim()}` : renameDialog.newName.trim();
+           invalidateFoldersForFiles([oldPath, newPath]);
         }
       } else {
         alert(`Failed to rename: ${result.error}`);
@@ -492,7 +395,66 @@ export default function Sidebar() {
     } catch (error: any) {
       alert(`Error: ${error.message}`);
     }
-  }, [renameDialog, mode, projectRoot, expandedFolders, refreshDirectory, invalidateFoldersForFiles, loadFolderChildren]);
+  }, [renameDialog, projectRoot, refreshDirectory, invalidateFoldersForFiles]);
+
+  // Handle Copy/Move actions
+  const handleTransfer = async (item: FileSystemItem, action: 'copy' | 'move') => {
+    if (!window.electronAPI?.showOpenDialog) return;
+
+    try {
+      // Select destination folder
+      const result = await window.electronAPI.showOpenDialog({
+        properties: ['openDirectory'],
+        title: action === 'copy' ? 'Copy to...' : 'Move to...'
+      });
+
+      if (result.canceled || result.filePaths.length === 0) return;
+
+      const destFolder = normalizePath(result.filePaths[0]);
+      const fileName = item.path.split(/[/\\]/).pop() || item.name;
+      const destPath = `${destFolder}/${fileName}`;
+
+      // Execute action
+      let response;
+      if (action === 'copy') {
+        response = await window.electronAPI.copyFile(item.path, destPath);
+      } else {
+        response = await window.electronAPI.moveFile(item.path, destPath);
+      }
+
+      if (!response.success) {
+        console.error(`Failed to ${action} file:`, response.error);
+        alert(`Failed to ${action} file: ${response.error}`);
+        return;
+      }
+
+      // Always Refresh Files view
+      refreshDirectory();
+
+      // Refresh Project view if applicable
+      if (projectRoot) {
+        const filesToInvalidate: string[] = [];
+        
+        // 1. Destination (always invalidate if inside project)
+        if (destPath.startsWith(projectRoot)) {
+           filesToInvalidate.push(destPath);
+        }
+        
+        // 2. Source (invalidate parent if inside project - mostly for move)
+        if (action === 'move' && item.path.startsWith(projectRoot)) {
+           filesToInvalidate.push(item.path);
+        }
+        
+        if (filesToInvalidate.length > 0) {
+           invalidateFoldersForFiles(filesToInvalidate);
+        }
+      }
+
+    } catch (error) {
+      console.error(`Error during ${action}:`, error);
+      alert(`Error during ${action}: ${error}`);
+    }
+  };
 
   const handleRightClick = async (e: React.MouseEvent, item: FileSystemItem) => {
     e.preventDefault();
@@ -538,6 +500,17 @@ export default function Sidebar() {
         onClick: () => navigator.clipboard.writeText(item.path) 
       },
       { 
+        label: 'Copy to...', 
+        icon: <Copy size={14} />, 
+        onClick: () => handleTransfer(item, 'copy') 
+      },
+      { 
+        label: 'Move to...', 
+        icon: <ArrowRight size={14} />, 
+        onClick: () => handleTransfer(item, 'move') 
+      },
+      { divider: true },
+      { 
         label: 'Rename', 
         icon: <Type size={14} />, 
         onClick: () => {
@@ -551,7 +524,14 @@ export default function Sidebar() {
         onClick: async () => {
           if (window.electronAPI?.trashFile) {
             await window.electronAPI.trashFile(item.path);
+            
+            // Immediate refresh for Files view
             refreshDirectory();
+            
+            // Immediate refresh for Project view if applicable
+            if (projectRoot && item.path.startsWith(projectRoot)) {
+               invalidateFoldersForFiles([item.path]);
+            }
           }
         }
       },

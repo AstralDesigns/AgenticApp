@@ -781,6 +781,42 @@ ipcMain.handle('project:set-current', async (_, projectPath: string | null) => {
   setupProjectWatcher(projectPath);
 });
 
+// IPC handler for copying a file or folder
+ipcMain.handle('copy-file', async (_, sourcePath: string, destPath: string) => {
+  try {
+    let resolvedSource = sourcePath.startsWith('~') ? sourcePath.replace(/^~/, os.homedir()) : sourcePath;
+    let resolvedDest = destPath.startsWith('~') ? destPath.replace(/^~/, os.homedir()) : destPath;
+    
+    // Copy the file or directory
+    const stats = await fs.stat(resolvedSource);
+    if (stats.isDirectory()) {
+      await copyDirectory(resolvedSource, resolvedDest);
+    } else {
+      await fs.copyFile(resolvedSource, resolvedDest);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Electron] Failed to copy file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// IPC handler for moving a file or folder
+ipcMain.handle('move-file', async (_, sourcePath: string, destPath: string) => {
+  try {
+    let resolvedSource = sourcePath.startsWith('~') ? sourcePath.replace(/^~/, os.homedir()) : sourcePath;
+    let resolvedDest = destPath.startsWith('~') ? destPath.replace(/^~/, os.homedir()) : destPath;
+    
+    await fs.rename(resolvedSource, resolvedDest);
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Electron] Failed to move file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // IPC handler for trashing a file
 ipcMain.handle('trash-file', async (_, filePath: string) => {
   try {
