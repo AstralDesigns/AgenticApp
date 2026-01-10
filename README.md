@@ -59,9 +59,10 @@ A futuristic AI-powered code editor and workspace with native local and non-loca
 ### Settings
 
 #### Handle app license key setup, user theme settings, AI API key setup, Pulling local Ollama models directly from the app
+<img width="1366" height="768" alt="screenshot_11012026_010039" src="https://github.com/user-attachments/assets/a8da93ea-9d89-4593-9c70-d0841bf1ee15" />
 <img width="1366" height="768" alt="screenshot_10012026_230016" src="https://github.com/user-attachments/assets/a4683f27-b6f1-40e9-92f4-cbdf9d70ad21" />
-<img width="1366" height="768" alt="screenshot_10012026_230016" src="https://github.com/user-attachments/assets/4a6a1439-d9fa-4284-a67c-8c21531c9b41" />
-<img width="1366" height="768" alt="screenshot_10012026_230016" src="https://github.com/user-attachments/assets/2f2a5862-972c-4bc7-a108-8654540740c7" />
+<img width="1366" height="768" alt="screenshot_10012026_230034" src="https://github.com/user-attachments/assets/81288194-9cf4-4857-9675-59f3ca91f231" />
+<img width="1366" height="768" alt="screenshot_10012026_230058" src="https://github.com/user-attachments/assets/fe7b8d3e-922f-427e-b887-114d3ab779ad" />
 
 ## Usage
 
